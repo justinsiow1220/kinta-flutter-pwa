@@ -15,6 +15,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import 'serialization_util.dart';
 
 import '/index.dart';
+import '/auth/kinta_auth_service.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -42,8 +43,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
-      errorBuilder: (context, state) => const HomeWidget(),
-      routes: [
+      errorBuilder: (context, state) => const LoginWidget(),
+      redirect: (context, state) {
+        final isAccountPage = state.uri.path == LoginWidget.routePath ||
+            state.uri.path == SignupWidget.routePath;
+        if (!KintaAuthService.isAuthenticated) {
+          return isAccountPage ? null : LoginWidget.routePath;
+        }
+        if (isAccountPage || state.uri.path == '/') {
+          return HomeWidget.routePath;
+        }
+        return null;
+      },      routes: [
         FFRoute(
           name: '_initialize',
           path: '/',

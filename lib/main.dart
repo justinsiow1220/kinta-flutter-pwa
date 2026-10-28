@@ -1,4 +1,4 @@
-import 'package:provider/provider.dart';
+﻿import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
@@ -8,11 +8,15 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/nav/nav.dart';
 import 'index.dart';
+import '/kinta_process_draft.dart';
+import '/auth/kinta_auth_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   GoRouter.optionURLReflectsImperativeAPIs = true;
   usePathUrlStrategy();
+  await KintaAuthService.restoreSavedSession();
+  await KintaProcessDraft.restore();
 
   final appState = FFAppState(); // Initialize FFAppState
   await appState.initializePersistedState();
@@ -94,3 +98,5 @@ class _MyAppState extends State<MyApp> {
     );
   }
 }
+
+

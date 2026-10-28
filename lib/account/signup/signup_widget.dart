@@ -4,6 +4,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/index.dart';
+import '/auth/kinta_auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/gestures.dart';
@@ -28,6 +29,8 @@ class _SignupWidgetState extends State<SignupWidget> {
   late SignupModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  final TextEditingController _employeeNoController = TextEditingController();
+  bool _isRegistering = false;
 
   @override
   void initState() {
@@ -51,11 +54,68 @@ class _SignupWidgetState extends State<SignupWidget> {
 
   @override
   void dispose() {
+    _employeeNoController.dispose();
     _model.dispose();
 
     super.dispose();
   }
 
+  Future<void> _register() async {
+    final employeeNo = _employeeNoController.text.trim();
+    final name = _model.nameCreateTextController?.text.trim() ?? '';
+    final username = _model.emailAddressCreateTextController?.text.trim() ?? '';
+    final password = _model.passwordCreateTextController?.text ?? '';
+    final confirmation = _model.passwordConfirmTextController?.text ?? '';
+
+    if (employeeNo.isEmpty || name.isEmpty || username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Complete all required fields.')),
+      );
+      return;
+    }
+    if (password.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password must be at least 8 characters.')),
+      );
+      return;
+    }
+    if (password != confirmation) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('The passwords do not match.')),
+      );
+      return;
+    }
+    if (_model.checkboxValue != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please accept the terms to continue.')),
+      );
+      return;
+    }
+
+    setState(() => _isRegistering = true);
+    try {
+      await KintaAuthService.register(
+        employeeNo: employeeNo,
+        name: name,
+        username: username,
+        password: password,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created and saved on this device.')),
+        );
+        context.goNamed(HomeWidget.routeName);
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not register: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRegistering = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -205,6 +265,28 @@ class _SignupWidgetState extends State<SignupWidget> {
                                       ),
                                     ),
                                     Padding(
+                                      padding: const EdgeInsetsDirectional.fromSTEB(
+                                          0.0, 0.0, 0.0, 16.0),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: TextFormField(
+                                          controller: _employeeNoController,
+                                          onChanged: (_) => safeSetState(() {}),
+                                          textCapitalization: TextCapitalization.characters,
+                                          decoration: InputDecoration(
+                                            labelText: 'Employee number *',
+                                            hintText: 'Enter your company employee number',
+                                            filled: true,
+                                            fillColor: FlutterFlowTheme.of(context).secondaryBackground,
+                                            contentPadding: const EdgeInsets.all(22.0),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10.0),
+                                            ),
+                                          ),
+                                          style: FlutterFlowTheme.of(context).bodyMedium,
+                                        ),
+                                      ),
+                                    ),                                    Padding(
                                       padding: const EdgeInsetsDirectional.fromSTEB(
                                           0.0, 0.0, 0.0, 16.0),
                                       child: SizedBox(
@@ -390,7 +472,7 @@ class _SignupWidgetState extends State<SignupWidget> {
                                           autofillHints: const [AutofillHints.email],
                                           obscureText: false,
                                           decoration: InputDecoration(
-                                            labelText: 'Email *',
+                                            labelText: 'Email (used as username) *',
                                             labelStyle:
                                                 FlutterFlowTheme.of(context)
                                                     .labelMedium
@@ -1188,24 +1270,16 @@ class _SignupWidgetState extends State<SignupWidget> {
                                         padding: const EdgeInsetsDirectional.fromSTEB(
                                             0.0, 0.0, 0.0, 10.0),
                                         child: FFButtonWidget(
-                                          onPressed: !((_model.nameCreateTextController.text !=
-                                                          '') &&
-                                                  (_model.emailAddressCreateTextController
-                                                              .text !=
-                                                          '') &&
-                                                  (_model.passwordCreateTextController
-                                                              .text !=
-                                                          '') &&
-                                                  (_model.passwordConfirmTextController
-                                                              .text !=
-                                                          '') &&
-                                                  (_model.checkboxValue !=
-                                                      false))
-                                              ? null
-                                              : () {
-                                                  print('Button pressed ...');
-                                                },
-                                          text: 'Sign Up',
+                                          onPressed: _isRegistering ||
+                                                _employeeNoController.text.trim().isEmpty ||
+                                                _model.nameCreateTextController!.text.trim().isEmpty ||
+                                                _model.emailAddressCreateTextController!.text.trim().isEmpty ||
+                                                _model.passwordCreateTextController!.text.isEmpty ||
+                                                _model.passwordConfirmTextController!.text.isEmpty ||
+                                                _model.checkboxValue != true
+                                            ? null
+                                            : _register,
+                                            text: _isRegistering ? 'Creating account...' : 'Sign Up',
                                           options: FFButtonOptions(
                                             width: MediaQuery.sizeOf(context)
                                                     .width *

@@ -21,6 +21,7 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="kinta-intern-justin">
 
@@ -58,6 +59,19 @@
   
   
   
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('kinta_service_worker.js')
+          .then(function (registration) {
+            console.info('KINTA app shell cache worker registered:', registration.scope);
+          })
+          .catch(function (error) {
+            console.error('KINTA app shell cache worker could not register:', error);
+          });
+      });
+    }
+  </script>
   <script>
     {{flutter_bootstrap_js}}
   </script>

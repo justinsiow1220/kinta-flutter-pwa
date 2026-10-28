@@ -1,8 +1,9 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/index.dart';
+import '/auth/kinta_auth_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +27,7 @@ class _LoginWidgetState extends State<LoginWidget> {
   late LoginModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isLoggingIn = false;
 
   @override
   void initState() {
@@ -48,6 +50,43 @@ class _LoginWidgetState extends State<LoginWidget> {
     super.dispose();
   }
 
+  Future<void> _login() async {
+    final username = _model.emailAddressTextController?.text.trim() ?? '';
+    final password = _model.passwordTextController?.text ?? '';
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter your email/username and password.')),
+      );
+      return;
+    }
+    setState(() => _isLoggingIn = true);
+    try {
+      await KintaAuthService.login(username: username, password: password);
+      if (mounted) context.goNamed(HomeWidget.routeName);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not log in: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoggingIn = false);
+    }
+  }
+  Future<void> _continueOffline() async {
+    setState(() => _isLoggingIn = true);
+    try {
+      final restored = await KintaAuthService.continueOffline();
+      if (!restored) throw StateError('This device has no unexpired offline-ready session. Connect and sign in online first.');
+      if (!mounted) return;
+      context.goNamed(HomeWidget.routeName);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Offline sign-in unavailable: $error')));
+    } finally {
+      if (mounted) setState(() => _isLoggingIn = false);
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -181,12 +220,8 @@ class _LoginWidgetState extends State<LoginWidget> {
                                               const Duration(milliseconds: 2000),
                                               () => safeSetState(() {}),
                                             ),
-                                            onFieldSubmitted: (_) async {
-                                              safeSetState(() {
-                                                _model
-                                                    .emailAddressTextController
-                                                    ?.clear();
-                                              });
+                                            onFieldSubmitted: (_) {
+                                              FocusScope.of(context).requestFocus(_model.passwordFocusNode);
                                             },
                                             autofocus: true,
                                             autofillHints: const [
@@ -196,7 +231,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                                                 TextCapitalization.none,
                                             obscureText: false,
                                             decoration: InputDecoration(
-                                              labelText: 'Email',
+                                              labelText: 'Email / Username',
                                               labelStyle:
                                                   FlutterFlowTheme.of(context)
                                                       .labelMedium
@@ -565,11 +600,8 @@ class _LoginWidgetState extends State<LoginWidget> {
                                               const EdgeInsetsDirectional.fromSTEB(
                                                   0.0, 0.0, 0.0, 10.0),
                                           child: FFButtonWidget(
-                                            onPressed: () async {
-                                              context.pushNamed(
-                                                  HomeWidget.routeName);
-                                            },
-                                            text: 'Log In',
+                                            onPressed: _isLoggingIn ? null : _login,
+                                            text: _isLoggingIn ? 'Logging in...' : 'Log In',
                                             options: FFButtonOptions(
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
@@ -623,7 +655,8 @@ class _LoginWidgetState extends State<LoginWidget> {
                                           ),
                                         ),
                                       ),
-                                      Align(
+                                      TextButton.icon(onPressed: _isLoggingIn ? null : _continueOffline, icon: const Icon(Icons.wifi_off), label: const Text('Continue Offline')),
+                                     Align(
                                         alignment:
                                             const AlignmentDirectional(0.0, 0.0),
                                         child: Row(
@@ -747,3 +780,5 @@ class _LoginWidgetState extends State<LoginWidget> {
     );
   }
 }
+
+
