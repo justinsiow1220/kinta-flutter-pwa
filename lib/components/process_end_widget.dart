@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '/kinta_api_service.dart';
 import '/auth/kinta_auth_service.dart';
@@ -43,7 +43,7 @@ class _ProcessEndWidgetState extends State<ProcessEndWidget> {
     final remarks = _remarks.text.trim().isEmpty ? null : _remarks.text.trim();
     final changes = <String, Object?>{
       'status': 'completed',
-      'ended_at': DateTime.now().toIso8601String(),
+      'ended_at': DateTime.now().toUtc().toIso8601String(),
       'qty_passed': passed,
       'qty_rejected': rejected,
       'remarks': remarks,

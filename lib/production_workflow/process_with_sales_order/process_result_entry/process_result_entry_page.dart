@@ -13,6 +13,7 @@ import '/flutter_flow/form_field_controller.dart';
 import 'dart:ui';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -171,7 +172,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Text(
-                                          '26 March 2024',
+                                          DateFormat('d MMMM yyyy').format(DateTime.now()),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -192,7 +193,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                               ),
                                         ),
                                         Text(
-                                          '08:37 am',
+                                          DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -702,7 +703,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
                                                                                                         Text(
-                                                                                                          '8',
+                                                                                                          KintaProcessDraft.instance.machineLabel ?? '-',
                                                                                                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                                                 font: GoogleFonts.inter(
                                                                                                                   fontWeight: FontWeight.w600,
@@ -758,7 +759,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                     ),
                                                                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                                                                     child: Text(
-                                                                                      'Activity 2',
+                                                                                      KintaProcessDraft.instance.activityLabel ?? 'Activity not selected',
                                                                                       style: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                             font: GoogleFonts.manrope(
                                                                                               fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -1699,7 +1700,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                                           'problem_id': id,
                                                                                                           'problem_code': problem['code']?.toString(),
                                                                                                           'problem_name': problem['name']?.toString(),
-                                                                                                          'reported_at': DateTime.now().toIso8601String()
+                                                                                                          'reported_at': DateTime.now().toUtc().toIso8601String()
                                                                                                         },
                                                                                                         pendingSync: true);
                                                                                                   }

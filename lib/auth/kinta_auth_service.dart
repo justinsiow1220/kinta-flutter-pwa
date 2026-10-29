@@ -1,9 +1,9 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:cryptography/cryptography.dart';
 import '/kinta_api_service.dart';
 import '/offline/kinta_local_repository.dart';
 
-/// Online login/register and device-local validation of a CI4 signed grant.
+/// Online supervisor login and device-local validation of a CI4 signed grant.
 class KintaAuthService {
   KintaAuthService._();
   static const _issuer = 'kinta-ci4';
@@ -32,14 +32,10 @@ class KintaAuthService {
     if (token is! String) { await KintaLocalRepository.clearSignedSession(); return; }
     final claims = await _verifyGrant(token);
     if (claims == null) { await KintaLocalRepository.clearSignedSession(); return; }
-    final cachedDataReady = await KintaLocalRepository.hasOfflineBootstrapData();
+    final savedUser = saved['user'];
+    final userId = savedUser is Map ? savedUser['id']?.toString() : null;
+    final cachedDataReady = await KintaLocalRepository.hasOfflineBootstrapData(userId: userId);
     _applySession(token, claims, user: saved['user'], offlineReady: saved['offline_ready'] == true && cachedDataReady);
-  }
-
-  static Future<Map<String, dynamic>> register({required String employeeNo, required String name, required String username, required String password}) async {
-    final result = await KintaApiService.postJson('auth/register', {'employee_no': employeeNo.trim(), 'name': name.trim(), 'username': username.trim().toLowerCase(), 'password': password}, authenticated: false);
-    await _acceptOnlineAuth(result);
-    return _currentUser!;
   }
 
   static Future<Map<String, dynamic>> login({required String username, required String password}) async {
@@ -54,11 +50,11 @@ class KintaAuthService {
     final claims = await _verifyGrant(token);
     if (claims == null) throw const FormatException('CI4 returned an invalid signed offline access grant.');
     _applySession(token, claims, user: response['user'], offlineReady: false);
-    await KintaLocalRepository.saveSignedSession({'grant': token, 'user': response['user'], 'offline_ready': false, 'saved_at': DateTime.now().toIso8601String()});
+    await KintaLocalRepository.saveSignedSession({'grant': token, 'user': response['user'], 'offline_ready': false, 'saved_at': DateTime.now().toUtc().toIso8601String()});
     try {
       await KintaApiService.preloadMasterData();
       _offlineReady = true;
-      await KintaLocalRepository.saveSignedSession({'grant': token, 'user': response['user'], 'offline_ready': true, 'saved_at': DateTime.now().toIso8601String()});
+      await KintaLocalRepository.saveSignedSession({'grant': token, 'user': response['user'], 'offline_ready': true, 'saved_at': DateTime.now().toUtc().toIso8601String()});
     } catch (error) {
       // Keep the online session usable; the home screen offers preload retry.
       _offlineReady = false;
@@ -69,13 +65,13 @@ class KintaAuthService {
     if (!isAuthenticated) return false;
     await KintaApiService.preloadMasterData();
     _offlineReady = true;
-    await KintaLocalRepository.saveSignedSession({'grant': _grant!, 'user': _currentUser, 'offline_ready': true, 'saved_at': DateTime.now().toIso8601String()});
+    await KintaLocalRepository.saveSignedSession({'grant': _grant!, 'user': _currentUser, 'offline_ready': true, 'saved_at': DateTime.now().toUtc().toIso8601String()});
     return true;
   }
 
   static Future<bool> continueOffline() async {
     final saved = await KintaLocalRepository.readSignedSession();
-    if (saved == null || saved['offline_ready'] != true || saved['grant'] is! String || !await KintaLocalRepository.hasOfflineBootstrapData()) return false;
+    if (saved == null || saved['offline_ready'] != true || saved['grant'] is! String || !await KintaLocalRepository.hasOfflineBootstrapData(userId: (saved['user'] is Map ? saved['user']['id']?.toString() : null))) return false;
     final claims = await _verifyGrant(saved['grant'] as String);
     if (claims == null) return false;
     _applySession(saved['grant'] as String, claims, user: saved['user'], offlineReady: true);
@@ -98,7 +94,7 @@ class KintaAuthService {
       final claims = jsonDecode(utf8.decode(_decode(parts[1]))) as Map<String, dynamic>;
       if (header['alg'] != 'RS256' || header['typ'] != 'JWT' || header['kid'] != _keyId || claims['iss'] != _issuer || claims['aud'] != _audience || claims['offline_allowed'] != true) return null;
       final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-      if (claims['exp'] is! int || claims['exp'] <= now || claims['nbf'] is! int || claims['nbf'] > now + 60 || claims['iat'] is! int || claims['iat'] > now + 60 || claims['user_id'] is! int || claims['sub'] != '${claims['user_id']}' || claims['role'] is! String || claims['permissions'] is! List) return null;
+      if (claims['exp'] is! int || claims['exp'] <= now || claims['nbf'] is! int || claims['nbf'] > now + 60 || claims['iat'] is! int || claims['iat'] > now + 60 || claims['user_id'] is! int || claims['sub'] != '${claims['user_id']}' || claims['role'] != 'supervisor' || claims['permissions'] is! List) return null;
       final algorithm = RsaSsaPkcs1v15(Sha256());
       final publicKey = RsaPublicKey(e: _decode(_exponent), n: _decode(_modulus));
       final signature = Signature(_decode(parts[2]), publicKey: publicKey);

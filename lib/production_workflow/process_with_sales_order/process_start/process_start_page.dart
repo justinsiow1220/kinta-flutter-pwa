@@ -1,10 +1,11 @@
-﻿import '/index.dart' show ScanSalesOrderWidget;
+import '/index.dart' show ScanSalesOrderWidget;
 import '/components/change_pic_dialog.dart';
 import '/components/process_started_with_sales_order_dialog.dart';
 import '/kinta_api_service.dart';
 import '/auth/kinta_auth_service.dart';
 import '/kinta_process_draft.dart';
 import '/offline/kinta_local_repository.dart';
+import '/utils/kinta_time.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -12,6 +13,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -178,7 +180,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Text(
-                                          '26 March 2024',
+                                          DateFormat('d MMMM yyyy').format(DateTime.now()),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -199,7 +201,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                               ),
                                         ),
                                         Text(
-                                          '08:37 am',
+                                          DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -709,7 +711,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
                                                                                                         Text(
-                                                                                                          '8',
+                                                                                                          KintaProcessDraft.instance.machineLabel ?? '-',
                                                                                                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                                                 font: GoogleFonts.inter(
                                                                                                                   fontWeight: FontWeight.w600,
@@ -765,7 +767,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                     ),
                                                                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                                                                     child: Text(
-                                                                                      'Activity 2',
+                                                                                      KintaProcessDraft.instance.activityLabel ?? 'Activity not selected',
                                                                                       style: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                             font: GoogleFonts.manrope(
                                                                                               fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -899,7 +901,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                               crossAxisAlignment: CrossAxisAlignment.start,
                                                                               children: [
                                                                                 Text(
-                                                                                  'Batch Qty: ${KintaProcessDraft.instance.batchQty ?? '-'}',
+                                                                                   'Batch Qty:',
                                                                                   style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                         font: GoogleFonts.inter(
                                                                                           fontWeight: FontWeight.w600,
@@ -1451,7 +1453,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                                     _localProcessRecord(
                                                                                                       draft,
                                                                                                       serverProcessId: draft.processId,
-                                                                                                      startedAt: data['started_at']?.toString() ?? DateTime.now().toIso8601String(),
+                                                                                                      startedAt: KintaTime.toUtcIso(data['started_at']) ?? DateTime.now().toUtc().toIso8601String(),
                                                                                                     ),
                                                                                                   );
                                                                                                 } catch (localError) {
@@ -1466,7 +1468,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                                     _localProcessRecord(
                                                                                                       draft,
                                                                                                       serverProcessId: null,
-                                                                                                      startedAt: DateTime.now().toIso8601String(),
+                                                                                                      startedAt: DateTime.now().toUtc().toIso8601String(),
                                                                                                     ),
                                                                                                   );
                                                                                                   draft.persistInBackground();

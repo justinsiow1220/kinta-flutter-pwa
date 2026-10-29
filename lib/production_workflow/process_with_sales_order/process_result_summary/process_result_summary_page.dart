@@ -5,12 +5,15 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/kinta_process_draft.dart';
 import '/kinta_api_service.dart';
 import '/offline/kinta_local_repository.dart';
+import '/utils/kinta_time.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '/production_workflow/process_records/process_records_dialog.dart';
 import 'process_result_summary_model.dart';
 export 'process_result_summary_model.dart';
 
@@ -40,7 +43,7 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
     _model.tabBarController = TabController(
       vsync: this,
       length: 2,
-      initialIndex: 0,
+      initialIndex: 1,
     )..addListener(() => safeSetState(() {}));
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
@@ -101,18 +104,12 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
 
   String get _remainingBatchText => '${_remainingBatchQuantity ?? '-'} unit';
 
-  String _dateText(Object? value) {
-    if (value == null || value.toString().isEmpty) return '-';
-    final parsed = DateTime.tryParse(value.toString());
-    if (parsed == null) return value.toString();
-    final date = parsed.toLocal();
-    final hour = date.hour % 12 == 0 ? 12 : date.hour % 12;
-    final period = date.hour < 12 ? 'am' : 'pm';
-    final minute = date.minute.toString().padLeft(2, '0');
-    final second =
-        date.second == 0 ? '' : ':${date.second.toString().padLeft(2, '0')}';
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} | ${hour.toString().padLeft(2, '0')}:$minute$second$period';
-  }
+  String _dateText(Object? value) => KintaTime.formatLocal(
+        value,
+        pattern: 'yyyy-MM-dd | hh:mm:ss a',
+        empty: '-',
+        assumeLocalWhenUnmarked: KintaProcessDraft.instance.processId == null,
+      ).toLowerCase();
 
   String _problemText(int index) {
     final rows =
@@ -216,7 +213,8 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Text(
-                                          '26 March 2024',
+                                          DateFormat('d MMMM yyyy')
+                                              .format(DateTime.now()),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -237,7 +235,9 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                               ),
                                         ),
                                         Text(
-                                          '08:37 am',
+                                          DateFormat('hh:mm a')
+                                              .format(DateTime.now())
+                                              .toLowerCase(),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -405,6 +405,9 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
+                                                              const ProcessRecordsDialog(
+                                                                  embedded:
+                                                                      true),
                                                               Padding(
                                                                 padding:
                                                                     const EdgeInsets
@@ -741,7 +744,7 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
                                                                                                         Text(
-                                                                                                          '8',
+                                                                                                          KintaProcessDraft.instance.machineLabel ?? '-',
                                                                                                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                                                 font: GoogleFonts.inter(
                                                                                                                   fontWeight: FontWeight.w600,
@@ -797,7 +800,7 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                                                                     ),
                                                                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                                                                     child: Text(
-                                                                                      'Activity 2',
+                                                                                      KintaProcessDraft.instance.activityLabel ?? 'Activity not selected',
                                                                                       style: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                             font: GoogleFonts.manrope(
                                                                                               fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -1396,6 +1399,7 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
+                                                                                        KintaProcessDraft.instance.prepareForNewProcess();
                                                                                         context.pushNamed(HomeWidget.routeName);
                                                                                       },
                                                                                       text: 'Start New',
@@ -1430,24 +1434,6 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                                                         ),
                                                                       ),
                                                                     ],
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              const Padding(
-                                                                padding:
-                                                                    const EdgeInsets
-                                                                        .all(
-                                                                        10.0),
-                                                                child:
-                                                                    const SingleChildScrollView(
-                                                                  primary:
-                                                                      false,
-                                                                  child:
-                                                                      const Column(
-                                                                    mainAxisSize:
-                                                                        MainAxisSize
-                                                                            .max,
-                                                                    children: const [],
                                                                   ),
                                                                 ),
                                                               ),

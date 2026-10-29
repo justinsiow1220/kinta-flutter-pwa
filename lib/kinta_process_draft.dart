@@ -1,8 +1,4 @@
-import 'package:flutter/foundation.dart';
-
-import '/offline/kinta_local_repository.dart';
-
-/// Process setup state shared by the existing screens and saved locally.
+/// Process setup selections shared by screens for the current app session.
 class KintaProcessDraft {
   KintaProcessDraft._();
 
@@ -35,70 +31,18 @@ class KintaProcessDraft {
     return (quantity - totalProcessed).clamp(0, quantity).toInt();
   }
 
-  Map<String, Object?> toMap() => {
-        'machine_id': machineId,
-        'sector_id': sectorId,
-        'activity_id': activityId,
-        'supervisor_id': supervisorId,
-        'process_id': processId,
-        'local_process_id': localProcessId,
-        'sales_order_id': salesOrderId,
-        'so_number': soNumber,
-        'customer_name': customerName,
-        'batch_qty': batchQty,
-        'qty_passed': qtyPassed,
-        'qty_rejected': qtyRejected,
-        'machine_label': machineLabel,
-        'sector_label': sectorLabel,
-        'activity_label': activityLabel,
-        'supervisor_name': supervisorName,
-        'operator_names': operatorNames,
-        'operator_ids': operatorIds.toList(),
-      };
-
-  static Future<void> restore() async {
-    try {
-      final saved = await KintaLocalRepository.readCurrentProcessDraft();
-      if (saved == null) return;
-      final draft = instance;
-      draft.machineId = _asInt(saved['machine_id']);
-      draft.sectorId = _asInt(saved['sector_id']);
-      draft.activityId = _asInt(saved['activity_id']);
-      draft.supervisorId = _asInt(saved['supervisor_id']);
-      draft.processId = _asInt(saved['process_id']);
-      draft.localProcessId = saved['local_process_id']?.toString();
-      draft.salesOrderId = _asInt(saved['sales_order_id']);
-      draft.soNumber = saved['so_number']?.toString();
-      draft.customerName = saved['customer_name']?.toString();
-      draft.batchQty = _asInt(saved['batch_qty']);
-      draft.qtyPassed = _asInt(saved['qty_passed']);
-      draft.qtyRejected = _asInt(saved['qty_rejected']);
-      draft.machineLabel = saved['machine_label']?.toString();
-      draft.sectorLabel = saved['sector_label']?.toString();
-      draft.activityLabel = saved['activity_label']?.toString();
-      draft.supervisorName = saved['supervisor_name']?.toString();
-      draft.operatorNames = (saved['operator_names'] as List? ?? [])
-          .map((name) => name.toString())
-          .toList();
-      draft.operatorIds = (saved['operator_ids'] as List? ?? [])
-          .map(_asInt)
-          .whereType<int>()
-          .toSet();
-    } catch (error) {
-      debugPrint('Could not restore KINTA process draft: $error');
-    }
+  /// Starts a fresh process while preserving the selected order and team setup.
+  void prepareForNewProcess() {
+    processId = null;
+    localProcessId = null;
+    qtyPassed = null;
+    qtyRejected = null;
+    // Draft selections are intentionally session-only and are not restored.
   }
 
-  /// Persists selection changes without blocking generated dropdown callbacks.
+  /// Kept as a no-op so existing generated callbacks compile. Selection state
+  /// is now memory-only and clears when the app is reloaded.
   void persistInBackground() {
-    KintaLocalRepository.saveCurrentProcessDraft(toMap()).then<void>(
-      (_) {},
-      onError: (Object error, StackTrace stackTrace) {
-        debugPrint('Could not save KINTA process draft: $error');
-      },
-    );
+    // Intentionally do not save selections into IndexedDB.
   }
-
-  static int? _asInt(Object? value) =>
-      value is int ? value : int.tryParse(value?.toString() ?? '');
 }

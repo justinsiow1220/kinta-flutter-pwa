@@ -61,60 +61,11 @@ class _SignupWidgetState extends State<SignupWidget> {
   }
 
   Future<void> _register() async {
-    final employeeNo = _employeeNoController.text.trim();
-    final name = _model.nameCreateTextController?.text.trim() ?? '';
-    final username = _model.emailAddressCreateTextController?.text.trim() ?? '';
-    final password = _model.passwordCreateTextController?.text ?? '';
-    final confirmation = _model.passwordConfirmTextController?.text ?? '';
-
-    if (employeeNo.isEmpty || name.isEmpty || username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Complete all required fields.')),
-      );
-      return;
-    }
-    if (password.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 8 characters.')),
-      );
-      return;
-    }
-    if (password != confirmation) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('The passwords do not match.')),
-      );
-      return;
-    }
-    if (_model.checkboxValue != true) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please accept the terms to continue.')),
-      );
-      return;
-    }
-
-    setState(() => _isRegistering = true);
-    try {
-      await KintaAuthService.register(
-        employeeNo: employeeNo,
-        name: name,
-        username: username,
-        password: password,
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created and saved on this device.')),
-        );
-        context.goNamed(HomeWidget.routeName);
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not register: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isRegistering = false);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Supervisor accounts are created by a KINTA administrator.'),
+      ),
+    );
   }
   @override
   Widget build(BuildContext context) {

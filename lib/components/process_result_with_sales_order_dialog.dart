@@ -6,6 +6,7 @@ import '/index.dart';
 import '/kinta_api_service.dart';
 import '/kinta_process_draft.dart';
 import '/offline/kinta_local_repository.dart';
+import '/utils/kinta_time.dart';
 
 class ProcessResultWidget extends StatefulWidget {
   const ProcessResultWidget({super.key});
@@ -88,7 +89,15 @@ class _ProcessResultWidgetState extends State<ProcessResultWidget> {
               child: Text(label,
                   style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
-            Expanded(child: Text(_display(value))),
+            Expanded(
+              child: Text(label == 'Started' || label == 'Ended'
+                  ? KintaTime.formatLocal(
+                      value,
+                      assumeLocalWhenUnmarked:
+                          KintaProcessDraft.instance.processId == null,
+                  )
+                  : _display(value)),
+            ),
           ],
         ),
       );
@@ -187,7 +196,7 @@ class _ProcessResultWidgetState extends State<ProcessResultWidget> {
                                       padding: const EdgeInsets.symmetric(
                                           vertical: 3),
                                       child: Text(
-                                          '${_display(inspection['qc_user_name'])}: ${_quantity(inspection['quantity'])}'),
+                                          '${_display(inspection['qc_user_name'])}: ${_quantity(inspection['quantity'])} at ${KintaTime.formatLocal(inspection['inspection_time'] ?? inspection['inspected_at'], assumeLocalWhenUnmarked: inspection['inspection_time'] == null)}'),
                                     )),
                           _sectionTitle('PIC history'),
                           if (_rows('pic_history').isEmpty)
@@ -200,7 +209,7 @@ class _ProcessResultWidgetState extends State<ProcessResultWidget> {
                                   padding:
                                       const EdgeInsets.symmetric(vertical: 3),
                                   child: Text(
-                                      '${_display(pic['supervisor_name'])} (${_display(pic['started_at'])} ? ${_display(pic['ended_at'], empty: 'current')})'),
+                                      '${_display(pic['supervisor_name'])} (${KintaTime.formatLocal(pic['started_at'], assumeLocalWhenUnmarked: KintaProcessDraft.instance.processId == null)} ? ${KintaTime.formatLocal(pic['ended_at'], assumeLocalWhenUnmarked: KintaProcessDraft.instance.processId == null, empty: 'current')})'),
                                 )),
                           _sectionTitle('Remarks'),
                           Text(_display(_process?['remarks'],

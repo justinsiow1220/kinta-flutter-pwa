@@ -9,6 +9,7 @@ import '/index.dart';
 import '/kinta_api_service.dart';
 import '/kinta_process_draft.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'process_setup_model.dart';
@@ -292,7 +293,7 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      '26 March 2024',
+                                      DateFormat('d MMMM yyyy').format(DateTime.now()),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -312,7 +313,7 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                           ),
                                     ),
                                     Text(
-                                      '08:37 am',
+                                      DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(

@@ -14,6 +14,7 @@ import '/offline/kinta_local_repository.dart';
 import '/offline/kinta_sync_service.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'machine_selection_model.dart';
@@ -259,7 +260,7 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      '26 March 2024',
+                                      DateFormat('d MMMM yyyy').format(DateTime.now()),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -279,7 +280,7 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
                                           ),
                                     ),
                                     Text(
-                                      '08:37 am',
+                                      DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -339,91 +340,6 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
                                                     .titleMedium
                                                     .fontStyle,
                                           ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding:
-                                        const EdgeInsetsDirectional.fromSTEB(
-                                            0.0, 0.0, 0.0, 15.0),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.max,
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Expanded(
-                                          child: Padding(
-                                            padding: const EdgeInsetsDirectional
-                                                .fromSTEB(5.0, 0.0, 5.0, 0.0),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.max,
-                                              children: [
-                                                FFButtonWidget(
-                                                  onPressed: () {
-                                                    print('Button pressed ...');
-                                                  },
-                                                  text: 'Machine 8',
-                                                  options: FFButtonOptions(
-                                                    width: MediaQuery.sizeOf(
-                                                                context)
-                                                            .width *
-                                                        0.333,
-                                                    height: 40.0,
-                                                    padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(
-                                                            0.0, 0.0, 0.0, 0.0),
-                                                    iconPadding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(
-                                                            0.0, 0.0, 0.0, 0.0),
-                                                    color: FlutterFlowTheme.of(
-                                                            context)
-                                                        .tertiary,
-                                                    textStyle: FlutterFlowTheme
-                                                            .of(context)
-                                                        .titleSmall
-                                                        .override(
-                                                          font: GoogleFonts
-                                                              .manrope(
-                                                            fontWeight:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .titleSmall
-                                                                    .fontWeight,
-                                                            fontStyle:
-                                                                FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .titleSmall
-                                                                    .fontStyle,
-                                                          ),
-                                                          color: Colors.white,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .titleSmall
-                                                                  .fontWeight,
-                                                          fontStyle:
-                                                              FlutterFlowTheme.of(
-                                                                      context)
-                                                                  .titleSmall
-                                                                  .fontStyle,
-                                                        ),
-                                                    elevation: 3.0,
-                                                    borderSide:
-                                                        const BorderSide(
-                                                      width: 1.0,
-                                                    ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            0.0),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
                                     ),
                                   ),
                                   Padding(

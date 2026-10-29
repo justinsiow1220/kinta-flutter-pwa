@@ -1,4 +1,4 @@
-﻿import '/kinta_api_service.dart';
+import '/kinta_api_service.dart';
 import '/auth/kinta_auth_service.dart';
 import '/kinta_process_draft.dart';
 import '/offline/kinta_local_repository.dart';
@@ -45,7 +45,7 @@ class KintaSyncService {
             'sync_status': 'conflict',
             'sync_error': message,
             'conflict_code': 'ACTOR_MISMATCH',
-            'conflict_detected_at': DateTime.now().toIso8601String(),
+            'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
           });
           continue;
         }
@@ -143,7 +143,7 @@ class KintaSyncService {
             'sync_status': 'synced',
             'sync_pending': false,
             'sync_error': null,
-            'synced_at': DateTime.now().toIso8601String(),
+            'synced_at': DateTime.now().toUtc().toIso8601String(),
             'end_sync_status':
                 completed ? 'synced' : process['end_sync_status'],
             'qc_inspections': savedQc,
@@ -166,14 +166,14 @@ class KintaSyncService {
                 'sync_status': 'conflict',
                 'sync_error': error.message,
                 'conflict_snapshot': error.data ?? <String, dynamic>{},
-                'conflict_detected_at': DateTime.now().toIso8601String(),
+                'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
               });
             } else {
               await KintaLocalRepository.updateLocalProcess(localId, {
                 'sync_pending': true,
                 'sync_status': 'pending',
                 'sync_error': error.toString(),
-                'last_sync_attempt_at': DateTime.now().toIso8601String(),
+                'last_sync_attempt_at': DateTime.now().toUtc().toIso8601String(),
               });
             }
           } catch (_) {}

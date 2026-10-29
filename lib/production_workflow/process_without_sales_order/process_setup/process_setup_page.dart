@@ -7,6 +7,7 @@ import '/flutter_flow/form_field_controller.dart';
 import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'process_setup_model.dart';
@@ -115,7 +116,7 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                     mainAxisSize: MainAxisSize.max,
                                     children: [
                                       Text(
-                                        '26 March 2024',
+                                        DateFormat('d MMMM yyyy').format(DateTime.now()),
                                         style: FlutterFlowTheme.of(context)
                                             .titleMedium
                                             .override(
@@ -135,7 +136,7 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                             ),
                                       ),
                                       Text(
-                                        '08:37 am',
+                                        DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                         style: FlutterFlowTheme.of(context)
                                             .titleMedium
                                             .override(

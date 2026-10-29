@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import '/auth/kinta_auth_service.dart';
 import '/kinta_api_service.dart';
 import '/offline/kinta_local_repository.dart';
+import '/utils/kinta_time.dart';
 
 /// Displays server-side process history and local work waiting to synchronize.
 class ProcessRecordsDialog extends StatefulWidget {
-  const ProcessRecordsDialog({super.key});
+  const ProcessRecordsDialog({super.key, this.embedded = false});
+
+  /// When true, renders the same records list inside Process Setup's Previous tab.
+  /// The embedded history is read-only and does not include a dialog Close action.
+  final bool embedded;
 
   @override
   State<ProcessRecordsDialog> createState() => _ProcessRecordsDialogState();
@@ -28,6 +33,24 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
     _loadRecords();
   }
 
+  List<Map<String, dynamic>> _sortByStartedAt(List<Map<String, dynamic>> rows) {
+    rows.sort((a, b) {
+      final aTime =
+          KintaTime.parseUtc(a['started_at'], assumeLocalWhenUnmarked: true)
+                  ?.millisecondsSinceEpoch ??
+              0;
+      final bTime =
+          KintaTime.parseUtc(b['started_at'], assumeLocalWhenUnmarked: true)
+                  ?.millisecondsSinceEpoch ??
+              0;
+      final byTime = bTime.compareTo(aTime);
+      if (byTime != 0) return byTime;
+      return (int.tryParse('${b['id'] ?? b['local_id'] ?? 0}') ?? 0)
+          .compareTo(int.tryParse('${a['id'] ?? a['local_id'] ?? 0}') ?? 0);
+    });
+    return rows;
+  }
+
   Future<void> _loadRecords() async {
     setState(() {
       _loading = true;
@@ -39,15 +62,21 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
         KintaLocalRepository.readAllLocalProcesses(),
       ]);
       if (!mounted) return;
-      final serverIds = results[0]
+      final currentUserId = KintaAuthService.currentUser?['id']?.toString();
+      final serverRows = results[0]
+          .where((row) =>
+              row['created_by_workforce_id']?.toString() == currentUserId)
+          .toList();
+      final serverIds = serverRows
           .map((row) => row['id']?.toString())
           .whereType<String>()
           .toSet();
       setState(() {
-        _serverRecords = results[0];
+        _serverRecords = _sortByStartedAt(serverRows);
         _localRecords = results[1].where((row) {
           final serverId = row['server_process_id']?.toString();
-          return row['server_record_archived'] != true &&
+          return row['actor_user_id']?.toString() == currentUserId &&
+              row['server_record_archived'] != true &&
               (serverId == null ||
                   !serverIds.contains(serverId) ||
                   row['sync_status'] == 'conflict' ||
@@ -60,11 +89,15 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
       try {
         final local = await KintaLocalRepository.readAllLocalProcesses();
         if (mounted) {
-          setState(() => _localRecords = local.where((row) =>
-              row['server_record_archived'] != true &&
-              (row['server_process_id'] == null ||
-                  row['sync_status'] == 'conflict' ||
-                  row['sync_pending'] == true)).toList());
+          final currentUserId = KintaAuthService.currentUser?['id']?.toString();
+          setState(() => _localRecords = local
+              .where((row) =>
+                  row['actor_user_id']?.toString() == currentUserId &&
+                  row['server_record_archived'] != true &&
+                  (row['server_process_id'] == null ||
+                      row['sync_status'] == 'conflict' ||
+                      row['sync_pending'] == true))
+              .toList());
         }
       } catch (_) {}
     } finally {
@@ -86,7 +119,8 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not load full process details: $error')),
+          SnackBar(
+              content: Text('Could not load full process details: $error')),
         );
       }
     } finally {
@@ -94,7 +128,8 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
     }
   }
 
-  Future<bool> _confirmDelete({required String title, required String message}) async =>
+  Future<bool> _confirmDelete(
+          {required String title, required String message}) async =>
       await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -132,18 +167,29 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
       await KintaApiService.deleteJson('processes/${row['id']}');
       try {
         final localRows = await KintaLocalRepository.readAllLocalProcesses();
-        for (final localRow in localRows.where((item) => item['server_process_id']?.toString() == row['id'].toString())) {
-          await KintaLocalRepository.updateLocalProcess(localRow['local_id'].toString(), {'server_record_archived': true});
+        for (final localRow in localRows.where((item) =>
+            item['server_process_id']?.toString() == row['id'].toString())) {
+          await KintaLocalRepository.updateLocalProcess(
+              localRow['local_id'].toString(),
+              {'server_record_archived': true});
         }
-        final cached = await KintaLocalRepository.readMasterDataList('processes');
+        final historyCacheKey = KintaApiService.processHistoryCacheKey();
+        final cached =
+            await KintaLocalRepository.readMasterDataList(historyCacheKey);
         if (cached != null) {
-          await KintaLocalRepository.cacheMasterDataList('processes', cached.where((item) => item['id'].toString() != row['id'].toString()).toList());
+          await KintaLocalRepository.cacheMasterDataList(
+              historyCacheKey,
+              cached
+                  .where(
+                      (item) => item['id'].toString() != row['id'].toString())
+                  .toList());
         }
       } catch (_) {}
       await _loadRecords();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Process archived from the app list; its history remains in MySQL.'),
+          content: Text(
+              'Process archived from the app list; its history remains in MySQL.'),
         ));
       }
     } catch (error) {
@@ -180,72 +226,75 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final canDelete = KintaAuthService.hasPermission('process.delete');
+    final canDelete =
+        !widget.embedded && KintaAuthService.hasPermission('process.delete');
+    final content = Column(
+      children: [
+        ListTile(
+          title: const Text(
+            'Process Records',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          subtitle: const Text(
+            'Server records visible to this account and local copies',
+          ),
+          trailing: IconButton(
+            onPressed: _loading ? null : _loadRecords,
+            tooltip: 'Refresh records',
+            icon: const Icon(Icons.refresh),
+          ),
+        ),
+        if (_loading) const LinearProgressIndicator(),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              'Could not refresh server records: $_error',
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
+        Expanded(
+          child: _loading && _serverRecords.isEmpty && _localRecords.isEmpty
+              ? const SizedBox.shrink()
+              : ListView(
+                  children: [
+                    const _SectionHeader(
+                        'Saved in CI4 / MySQL (visible to this account)'),
+                    if (_serverRecords.isEmpty)
+                      const ListTile(
+                          title: Text('No server process records found.')),
+                    for (final row in _serverRecords)
+                      _serverTile(row, canDelete),
+                    const Divider(height: 24),
+                    const _SectionHeader(
+                        'Local copies or work not shown in the server list'),
+                    if (_localRecords.isEmpty)
+                      const ListTile(
+                          title:
+                              Text('No unsynced or conflicted local records.')),
+                    for (final row in _localRecords)
+                      _localTile(row, allowDelete: !widget.embedded),
+                  ],
+                ),
+        ),
+        if (!widget.embedded)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ),
+      ],
+    );
+
+    if (widget.embedded) return content;
     final width = MediaQuery.sizeOf(context).width;
     return Dialog(
       child: SizedBox(
         width: width > 760 ? 720 : width * .94,
         height: MediaQuery.sizeOf(context).height * .82,
-        child: Column(
-          children: [
-            ListTile(
-              title: const Text(
-                'Process Records',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              subtitle: const Text(
-                'Server records visible to this account and local copies',
-              ),
-              trailing: IconButton(
-                onPressed: _loading ? null : _loadRecords,
-                tooltip: 'Refresh records',
-                icon: const Icon(Icons.refresh),
-              ),
-            ),
-            if (_loading) const LinearProgressIndicator(),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(
-                  'Could not refresh server records: $_error',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            Expanded(
-              child: _loading &&
-                      _serverRecords.isEmpty &&
-                      _localRecords.isEmpty
-                  ? const SizedBox.shrink()
-                  : ListView(
-                      children: [
-                        const _SectionHeader('Saved in CI4 / MySQL (visible to this account)'),
-                        if (_serverRecords.isEmpty)
-                          const ListTile(
-                            title: Text('No server process records found.'),
-                          ),
-                        for (final row in _serverRecords)
-                          _serverTile(row, canDelete),
-                        const Divider(height: 24),
-                        const _SectionHeader(
-                          'Local copies or work not shown in the server list',
-                        ),
-                        if (_localRecords.isEmpty)
-                          const ListTile(
-                            title: Text('No unsynced or conflicted local records.'),
-                          ),
-                        for (final row in _localRecords) _localTile(row),
-                      ],
-                    ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
-              ),
-            ),
-          ],
-        ),
+        child: content,
       ),
     );
   }
@@ -270,11 +319,14 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
               'S/O: ${row['so_number'] ?? 'None'} - Status: ${row['status']}',
               if (row['created_by_name'] != null)
                 'Created by: ${row['created_by_name']}',
-              if (row['started_at'] != null) 'Started: ${row['started_at']}',
-              if (row['ended_at'] != null) 'Ended: ${row['ended_at']}',
+              if (row['started_at'] != null)
+                'Started: ${KintaTime.formatLocal(row['started_at'])}',
+              if (row['ended_at'] != null)
+                'Ended: ${KintaTime.formatLocal(row['ended_at'])}',
               if (row['qty_passed'] != null || row['qty_rejected'] != null)
                 'Passed: ${row['qty_passed'] ?? 0} - Rejected: ${row['qty_rejected'] ?? 0}',
-              if (row['remarks'] != null && row['remarks'].toString().isNotEmpty)
+              if (row['remarks'] != null &&
+                  row['remarks'].toString().isNotEmpty)
                 'Remarks: ${row['remarks']}',
             ].join('\n')),
             isThreeLine: true,
@@ -284,7 +336,8 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
                 IconButton(
                   tooltip: expanded ? 'Hide details' : 'View full details',
                   onPressed: id == null ? null : () => _toggleDetails(id),
-                  icon: Icon(expanded ? Icons.expand_less : Icons.visibility_outlined),
+                  icon: Icon(
+                      expanded ? Icons.expand_less : Icons.visibility_outlined),
                 ),
                 if (canDelete && (owner || privileged))
                   IconButton(
@@ -326,7 +379,8 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
         .toList();
     final inspections = (details['qc_inspections'] as List? ?? [])
         .whereType<Map>()
-        .map((row) => '${row['qc_user_name']}: quantity ${row['quantity']}')
+        .map((row) =>
+            '${row['qc_user_name']}: quantity ${row['quantity']} at ${KintaTime.formatLocal(row['inspection_time'])}')
         .toList();
     final problems = (details['problems'] as List? ?? [])
         .whereType<Map>()
@@ -334,7 +388,8 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
         .toList();
     final pics = (details['pic_history'] as List? ?? [])
         .whereType<Map>()
-        .map((row) => '${row['supervisor_name']} (${row['started_at']})')
+        .map((row) =>
+            '${row['supervisor_name']} (${KintaTime.formatLocal(row['started_at'])})')
         .toList();
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -351,7 +406,8 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
     );
   }
 
-  Widget _localTile(Map<String, dynamic> row) => Card(
+  Widget _localTile(Map<String, dynamic> row, {required bool allowDelete}) =>
+      Card(
         margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         child: ListTile(
           title: Text(
@@ -360,10 +416,10 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
           subtitle: Text(
             'Status: ${row['sync_status'] ?? 'pending'}${row['sync_error'] == null ? '' : '\n${row['sync_error']}'}\n'
             'Machine: ${row['machine_name'] ?? 'Unknown'} - Sector: ${row['sector_name'] ?? 'Unknown'}\n'
-            'Started: ${row['started_at'] ?? 'Unknown'}\n'
+            'Started: ${KintaTime.formatLocal(row['started_at'], assumeLocalWhenUnmarked: true, empty: 'Unknown')}\n'
             'Passed: ${row['qty_passed'] ?? 'Not entered'} - Rejected: ${row['qty_rejected'] ?? 'Not entered'}',
           ),
-          trailing: row['server_process_id'] == null
+          trailing: allowDelete && row['server_process_id'] == null
               ? IconButton(
                   tooltip: 'Delete local unsynced record',
                   onPressed: () => _deleteLocalRecord(row),

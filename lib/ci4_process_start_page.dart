@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '/utils/kinta_time.dart';
 
 const _apiBaseUrl = 'http://localhost:8080/api';
 
@@ -312,20 +313,20 @@ class _Ci4ProcessStartPageState extends State<Ci4ProcessStartPage> {
               Text('Status: ${details['status']}'),
               Text('PIC: ${details['current_supervisor_name']}'),
               Text('Sales order: ${details['so_number'] ?? 'None'}'),
-              Text('Started: ${details['started_at'] ?? 'Not recorded'}'),
-              Text('Ended: ${details['ended_at'] ?? 'Not ended'}'),
+              Text('Started: ${KintaTime.formatLocal(details['started_at'], empty: 'Not recorded')}'),
+              Text('Ended: ${KintaTime.formatLocal(details['ended_at'], empty: 'Not ended')}'),
               Text('Passed: ${details['qty_passed'] ?? '-'} | Rejected: ${details['qty_rejected'] ?? '-'}'),
               if ((details['description']?.toString() ?? '').isNotEmpty)
                 Text('Description: ${details['description']}'),
               if ((details['remarks']?.toString() ?? '').isNotEmpty)
                 Text('Remarks: ${details['remarks']}'),
               section('Operators (assignment history)', rows('operators'), (row) =>
-                '${row['operator_name']} (user ${row['user_id']}) - ${row['assigned_at']} to ${row['removed_at'] ?? 'Current'}'),
+                '${row['operator_name']} (user ${row['user_id']}) - ${KintaTime.formatLocal(row['assigned_at'])} to ${KintaTime.formatLocal(row['removed_at'], empty: 'Current')}'),
               section('QC inspections', rows('qc_inspections'), (row) =>
                 '${row['qc_user_name']} inspected ${row['quantity']} units at ${row['inspection_time']}'),
               section('Problems', rows('problems'), (row) => '${row['code']} - ${row['name']}'),
               section('PIC history', rows('pic_history'), (row) =>
-                '${row['supervisor_name']} - ${row['started_at']} to ${row['ended_at'] ?? 'Current'}'),
+                '${row['supervisor_name']} - ${KintaTime.formatLocal(row['started_at'])} to ${KintaTime.formatLocal(row['ended_at'], empty: 'Current')}'),
             ]),
           ),
         ),
@@ -515,7 +516,7 @@ class _Ci4ProcessStartPageState extends State<Ci4ProcessStartPage> {
           content: SizedBox(width: 420, child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
             for (final row in history)
               ListTile(dense: true, title: Text(row['supervisor_name'].toString()),
-                  subtitle: Text('${row['started_at']} - ${row['ended_at'] ?? 'Current PIC'}')),
+                  subtitle: Text('${KintaTime.formatLocal(row['started_at'])} - ${KintaTime.formatLocal(row['ended_at'], empty: 'Current PIC')}')),
             DropdownButtonFormField<int>(
               initialValue: supervisorId,
               decoration: const InputDecoration(labelText: 'New supervisor'),
@@ -582,7 +583,7 @@ class _Ci4ProcessStartPageState extends State<Ci4ProcessStartPage> {
             const Text('Assignment history'),
             for (final row in history)
               ListTile(dense: true, title: Text(row['operator_name'].toString()),
-                  subtitle: Text('${row['assigned_at']} - ${row['removed_at'] ?? 'Currently assigned'}')),
+                  subtitle: Text('${KintaTime.formatLocal(row['assigned_at'])} - ${KintaTime.formatLocal(row['removed_at'], empty: 'Currently assigned')}')),
             const Divider(),
             for (final user in _operators)
               if (_recordId(user) case final int id)

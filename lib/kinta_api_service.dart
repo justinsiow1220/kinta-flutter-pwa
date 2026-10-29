@@ -32,11 +32,11 @@ class KintaApiService {
         throw _exception(response.statusCode, payload, 'GET $path failed.');
       }
       final rows = (payload!['data'] as List).whereType<Map>().map((r) => Map<String, dynamic>.from(r)).toList();
-      try { await KintaLocalRepository.cacheMasterDataList(path, rows); } catch (_) {}
+      try { await KintaLocalRepository.cacheMasterDataList(_cacheKey(path), rows); } catch (_) {}
       return rows;
     } on http.ClientException {
       if (!allowCachedOfflineFallback) rethrow;
-      var cached = await KintaLocalRepository.readMasterDataList(path);
+      var cached = await KintaLocalRepository.readMasterDataList(_cacheKey(path));
       if (cached == null && path.startsWith('master-data/activities?sector_id=')) {
         final allActivities = await KintaLocalRepository.readMasterDataList('master-data/activities');
         final sectorId = Uri.parse('http://localhost/$path').queryParameters['sector_id'];
@@ -46,6 +46,13 @@ class KintaApiService {
       rethrow;
     }
   }
+
+  static String _cacheKey(String path) {
+    if (path != 'processes') return path;
+    final userId = KintaAuthService.currentUser?['id']?.toString();
+    return 'processes/user/${userId ?? 'unknown'}';
+  }
+  static String processHistoryCacheKey() => _cacheKey('processes');
 
   /// Refreshes all lists required by process setup while online; only then is
   /// the current account marked as offline-ready.

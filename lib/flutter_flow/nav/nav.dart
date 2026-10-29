@@ -45,8 +45,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       navigatorKey: appNavigatorKey,
       errorBuilder: (context, state) => const LoginWidget(),
       redirect: (context, state) {
-        final isAccountPage = state.uri.path == LoginWidget.routePath ||
-            state.uri.path == SignupWidget.routePath;
+        final isAccountPage = state.uri.path == LoginWidget.routePath;
         if (!KintaAuthService.isAuthenticated) {
           return isAccountPage ? null : LoginWidget.routePath;
         }
@@ -64,11 +63,6 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: LoginWidget.routeName,
           path: LoginWidget.routePath,
           builder: (context, params) => const LoginWidget(),
-        ),
-        FFRoute(
-          name: SignupWidget.routeName,
-          path: SignupWidget.routePath,
-          builder: (context, params) => const SignupWidget(),
         ),
         FFRoute(
           name: VerifyEmailWidget.routeName,

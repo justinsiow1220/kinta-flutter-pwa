@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '/kinta_api_service.dart';
 import '/auth/kinta_auth_service.dart';
@@ -37,7 +37,6 @@ class _ChangePICWidgetState extends State<ChangePICWidget> {
   Future<void> _submit() async {
     if (!KintaAuthService.hasPermission('pic.change')) { ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Your offline grant does not permit changing the PIC.'))); return; }
     final draft = KintaProcessDraft.instance;
-    final processId = draft.processId;
     final localId = draft.localProcessId;
     if (_supervisorId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -51,10 +50,22 @@ class _ChangePICWidgetState extends State<ChangePICWidget> {
     setState(() => _saving = true);
     try {
       var offline = false;
-      if (processId != null) {
+      // A locally cached process is authoritative about whether it has a
+      // server ID. This prevents a stale draft processId from sending a local
+      // process to CI4 as if it were a server process.
+      final localProcess = localId == null
+          ? null
+          : await KintaLocalRepository.readLocalProcess(localId);
+      if (localId != null && localProcess == null) {
+        throw StateError('Saved process was not found locally. Return to the process list and reopen the active process.');
+      }
+      final serverId = localId != null
+          ? int.tryParse(localProcess?['server_process_id']?.toString() ?? '')
+          : draft.processId;
+      if (serverId != null) {
         try {
           await KintaApiService.putJson(
-              'processes/$processId/pic', {'supervisor_id': _supervisorId});
+              'processes/$serverId/pic', {'supervisor_id': _supervisorId});
         } on http.ClientException {
           if (localId == null) rethrow;
           offline = true;
@@ -63,8 +74,8 @@ class _ChangePICWidgetState extends State<ChangePICWidget> {
         offline = true;
       }
       if (localId != null) {
-        final now = DateTime.now().toIso8601String();
-        final current = await KintaLocalRepository.readLocalProcess(localId);
+        final now = DateTime.now().toUtc().toIso8601String();
+        final current = localProcess;
         if (current == null)
           throw StateError('Saved process was not found locally.');
         final history = List<Map<String, dynamic>>.from(

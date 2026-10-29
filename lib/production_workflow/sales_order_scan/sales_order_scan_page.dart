@@ -5,6 +5,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '/kinta_api_service.dart';
@@ -164,6 +165,8 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                                                         .toString()) ==
                                                     id)
                                                 .firstOrNull;
+                                            KintaProcessDraft.instance
+                                                .prepareForNewProcess();
                                             setState(() {
                                               KintaProcessDraft
                                                   .instance.salesOrderId = id;
@@ -198,7 +201,7 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      '26 March 2024',
+                                      DateFormat('d MMMM yyyy').format(DateTime.now()),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -218,7 +221,7 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                                           ),
                                     ),
                                     Text(
-                                      '08:37 am',
+                                      DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(

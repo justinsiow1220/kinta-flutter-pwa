@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '/kinta_api_service.dart';
 import '/auth/kinta_auth_service.dart';
 import '/kinta_process_draft.dart';
 import '/offline/kinta_local_repository.dart';
+import '/utils/kinta_time.dart';
 
 class QCInspectionWidget extends StatefulWidget {
   const QCInspectionWidget({super.key});
@@ -13,6 +14,7 @@ class QCInspectionWidget extends StatefulWidget {
 
 class _QCInspectionWidgetState extends State<QCInspectionWidget> {
   List<Map<String, dynamic>> _qcUsers = [];
+  List<Map<String, dynamic>> _inspections = [];
   int? _qcUserId;
   final _quantity = TextEditingController();
   bool _loading = true, _saving = false;
@@ -21,6 +23,7 @@ class _QCInspectionWidgetState extends State<QCInspectionWidget> {
   void initState() {
     super.initState();
     _loadQcUsers();
+    _loadInspectionHistory();
   }
 
   @override
@@ -38,6 +41,36 @@ class _QCInspectionWidgetState extends State<QCInspectionWidget> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _loadInspectionHistory() async {
+    final draft = KintaProcessDraft.instance;
+    final localId = draft.localProcessId;
+    final processId = draft.processId;
+    var history = <Map<String, dynamic>>[];
+    if (processId != null) {
+      try {
+        history = await KintaApiService.getList('processes/$processId/qc-inspections');
+      } catch (_) {
+        // Use the local process copy while offline.
+      }
+    }
+    if (localId != null) {
+      final local = await KintaLocalRepository.readLocalProcess(localId);
+      final queued = (local?['qc_inspections'] as List? ?? [])
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .where((row) => row['_sync_status'] != 'synced')
+          .toList();
+      history = [...queued, ...history];
+      if (processId == null && history.isEmpty) {
+        history = (local?['qc_inspections'] as List? ?? [])
+            .whereType<Map>()
+            .map((row) => Map<String, dynamic>.from(row))
+            .toList();
+      }
+    }
+    if (mounted) setState(() => _inspections = history);
   }
 
   Future<void> _submit() async {
@@ -62,7 +95,7 @@ class _QCInspectionWidgetState extends State<QCInspectionWidget> {
       'qc_user_id': _qcUserId,
       'qc_user_name': user['name']?.toString(),
       'quantity': qty,
-      'inspected_at': DateTime.now().toIso8601String()
+      'inspected_at': DateTime.now().toUtc().toIso8601String()
     };
     var offline = processId == null;
     setState(() => _saving = true);
@@ -95,7 +128,9 @@ class _QCInspectionWidgetState extends State<QCInspectionWidget> {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text(
                   'QC inspection saved on this device; it is not on the server yet.')));
-        Navigator.of(context).pop(true);
+        _quantity.clear();
+        setState(() => _qcUserId = null);
+        await _loadInspectionHistory();
       }
     } catch (error) {
       if (mounted)
@@ -117,6 +152,27 @@ class _QCInspectionWidgetState extends State<QCInspectionWidget> {
                 Text('QC Inspection',
                     style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: 16),
+                const Text('Recorded inspections'),
+                const SizedBox(height: 6),
+                if (_inspections.isEmpty)
+                  const Text('No QC inspections saved for this process yet.')
+                else
+                  ..._inspections.map((row) {
+                    final person = row['qc_user_name'] ?? row['name'] ?? 'QC staff';
+                    final inspectedAt = row['inspection_time'] ?? row['inspected_at'] ?? row['created_at'] ?? '';
+                    final quantity = row['quantity'] ?? '—';
+                    return Card(
+                      child: ListTile(
+                        dense: true,
+                        title: Text('$person · $quantity inspected'),
+                        subtitle: Text(KintaTime.formatLocal(
+                          inspectedAt,
+                          assumeLocalWhenUnmarked: row['inspection_time'] == null,
+                        )),
+                      ),
+                    );
+                  }),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
                     initialValue: _qcUserId,
                     decoration: const InputDecoration(

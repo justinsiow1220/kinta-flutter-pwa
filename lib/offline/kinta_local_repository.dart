@@ -33,12 +33,12 @@ class KintaLocalRepository {
     await _offlineCredentialStore.delete(db);
   }
 
-  static Future<bool> hasOfflineBootstrapData() async {
-    const keys = [
+  static Future<bool> hasOfflineBootstrapData({String? userId}) async {
+    final keys = [
       'master-data/machines', 'master-data/sectors', 'master-data/activities',
       'master-data/users?role=supervisor', 'master-data/users?role=operator',
       'master-data/users?role=qc', 'master-data/sales-orders', 'master-data/problems',
-      'processes/active', 'processes',
+      'processes/active', if (userId != null) 'processes/user/$userId' else 'processes/user/unknown',
     ];
     for (final key in keys) {
       if (await readMasterDataList(key) == null) return false;
@@ -47,7 +47,7 @@ class KintaLocalRepository {
   }
   static Future<void> cacheMasterDataList(String cacheKey, List<Map<String, dynamic>> rows) async {
     final db = await KintaLocalDatabase.open();
-    await _masterDataStore.record(cacheKey).put(db, {'cached_at': DateTime.now().toIso8601String(), 'rows': rows});
+    await _masterDataStore.record(cacheKey).put(db, {'cached_at': DateTime.now().toUtc().toIso8601String(), 'rows': rows});
   }
 
   static Future<List<Map<String, dynamic>>?> readMasterDataList(String cacheKey) async {
@@ -57,19 +57,14 @@ class KintaLocalRepository {
     return rows.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList();
   }
 
-  static Future<void> saveCurrentProcessDraft(Map<String, Object?> draft) async {
+  static Future<void> clearCurrentProcessDraft() async {
     final db = await KintaLocalDatabase.open();
-    await _processDraftStore.record('current').put(db, draft);
-  }
-  static Future<Map<String, dynamic>?> readCurrentProcessDraft() async {
-    final db = await KintaLocalDatabase.open();
-    final value = await _processDraftStore.record('current').get(db);
-    return value == null ? null : Map<String, dynamic>.from(value);
+    await _processDraftStore.record('current').delete(db);
   }
   static Future<String> createLocalProcess(Map<String, Object?> process) async {
     final db = await KintaLocalDatabase.open();
     final id = DateTime.now().microsecondsSinceEpoch.toString();
-    await _processStore.record(id).put(db, {...process, 'local_id': id, 'saved_locally_at': DateTime.now().toIso8601String()});
+    await _processStore.record(id).put(db, {...process, 'local_id': id, 'saved_locally_at': DateTime.now().toUtc().toIso8601String()});
     return id;
   }
   static Future<List<Map<String, dynamic>>> readAllLocalProcesses() async {
@@ -100,7 +95,7 @@ class KintaLocalRepository {
     final db = await KintaLocalDatabase.open();
     final current = await _processStore.record(id).get(db);
     if (current == null) throw StateError('Local process $id was not found.');
-    await _processStore.record(id).put(db, {...current, ...changes, 'saved_locally_at': DateTime.now().toIso8601String()});
+    await _processStore.record(id).put(db, {...current, ...changes, 'saved_locally_at': DateTime.now().toUtc().toIso8601String()});
   }
   /// Removes only an unsynced local draft; it never deletes a server row.
   static Future<void> deleteUnsyncedLocalProcess(String id) async {

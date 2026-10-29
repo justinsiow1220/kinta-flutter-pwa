@@ -1,4 +1,5 @@
 import '/components/process_started_without_sales_order_dialog.dart';
+import '/kinta_process_draft.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -7,6 +8,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'process_start_model.dart';
@@ -130,7 +132,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Text(
-                                          '26 March 2024',
+                                          DateFormat('d MMMM yyyy').format(DateTime.now()),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -151,7 +153,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                               ),
                                         ),
                                         Text(
-                                          '08:37 am',
+                                          DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -481,7 +483,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
                                                                                                         Text(
-                                                                                                          '8',
+                                                                                                          KintaProcessDraft.instance.machineLabel ?? '-',
                                                                                                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                                                 font: GoogleFonts.inter(
                                                                                                                   fontWeight: FontWeight.w600,
