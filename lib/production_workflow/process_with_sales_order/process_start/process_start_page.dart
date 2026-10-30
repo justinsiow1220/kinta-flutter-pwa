@@ -1,6 +1,7 @@
 import '/index.dart' show ScanSalesOrderWidget;
 import '/components/change_pic_dialog.dart';
 import '/components/process_started_with_sales_order_dialog.dart';
+import '/production_workflow/process_records/process_records_dialog.dart';
 import '/kinta_api_service.dart';
 import '/auth/kinta_auth_service.dart';
 import '/kinta_process_draft.dart';
@@ -369,11 +370,8 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
-                                                              const Column(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .max,
-                                                                children: const [],
+                                                              const ProcessRecordsDialog(
+                                                                embedded: true,
                                                               ),
                                                               Padding(
                                                                 padding:

@@ -1,4 +1,5 @@
 import '/components/process_started_without_sales_order_dialog.dart';
+import '/production_workflow/process_records/process_records_dialog.dart';
 import '/kinta_process_draft.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -319,11 +320,8 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
-                                                              const Column(
-                                                                mainAxisSize:
-                                                                    MainAxisSize
-                                                                        .max,
-                                                                children: const [],
+                                                              const ProcessRecordsDialog(
+                                                                embedded: true,
                                                               ),
                                                               Padding(
                                                                 padding:
