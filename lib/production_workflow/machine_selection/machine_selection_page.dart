@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import '/flutter_flow/flutter_flow_drop_down.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -30,7 +31,7 @@ class HomeWidget extends StatefulWidget {
   State<HomeWidget> createState() => _HomeWidgetState();
 }
 
-class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
+class _HomeWidgetState extends State<HomeWidget> {
   late HomeModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
@@ -39,8 +40,10 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
   bool _machinesLoading = true;
   String? _machineLoadError;
   int _pendingSyncCount = 0;
+  int _needsReviewCount = 0;
+  int _waitingForMasterDataCount = 0;
   bool _syncing = false;
-  Timer? _reconnectSyncTimer;
+  Timer? _pendingCountTimer;
 
   List<String> get _machineValues =>
       _machines.map((machine) => machine['id'].toString()).toList();
@@ -54,12 +57,10 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
     super.initState();
     _model = createModel(context, () => HomeModel());
     _model.dropDownValue = KintaProcessDraft.instance.machineId?.toString();
-    WidgetsBinding.instance.addObserver(this);
-    _reconnectSyncTimer = Timer.periodic(const Duration(seconds: 25), (_) async {
-      if (!_syncing && await KintaLocalRepository.countPendingLocalProcesses() > 0) {
-        await _syncPendingProcesses(silent: true);
-      }
-    });
+    _pendingCountTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => _refreshPendingSyncCount(),
+    );
     _loadMachines();
     _refreshPendingSyncCount();
 
@@ -68,8 +69,7 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _reconnectSyncTimer?.cancel();
+    _pendingCountTimer?.cancel();
     _model.dispose();
 
     super.dispose();
@@ -77,30 +77,62 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
 
   Future<void> _refreshPendingSyncCount() async {
     try {
-      final count = await KintaLocalRepository.countPendingLocalProcesses();
-      if (mounted) setState(() => _pendingSyncCount = count);
+      final actorUserId = KintaAuthService.currentUser?['id']?.toString();
+      final counts = await Future.wait<int>([
+        KintaLocalRepository.countPendingLocalProcesses(),
+        if (actorUserId != null)
+          KintaLocalRepository.countConflictedLocalProcesses(
+            actorUserId: actorUserId,
+          )
+        else
+          Future<int>.value(0),
+        if (actorUserId != null)
+          KintaLocalRepository.countWaitingForMasterDataLocalProcesses(
+            actorUserId: actorUserId,
+          )
+        else
+          Future<int>.value(0),
+      ]);
+      if (mounted) {
+        setState(() {
+          _pendingSyncCount = counts[0];
+          _needsReviewCount = counts[1];
+          _waitingForMasterDataCount = counts[2];
+        });
+      }
     } catch (_) {
       // Keep the sync action available even when the pending count is unavailable.
     }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _syncPendingProcesses(silent: true);
   }
 
   Future<void> _syncPendingProcesses({bool silent = false}) async {
     if (_syncing) return;
     setState(() => _syncing = true);
     try {
-      final report = await KintaSyncService.syncPendingProcesses();
+      final report = await KintaSyncService.syncPendingProcesses(
+        forceRetry: true,
+      );
       await _refreshPendingSyncCount();
       if (!mounted) return;
-      final message = report.hasErrors
-          ? '${report.synced} process(es) synced. ${report.errors.first}'
-          : report.synced == 0
-              ? 'No pending processes to sync.'
-              : '${report.synced} process(es) synced successfully.';
+      final message = report.needsReview > 0
+          ? '${report.synced} process(es) synced. '
+              '${report.needsReview} process(es) need review. '
+              'Open Process Records for details.'
+          : report.waitingForMasterData > 0
+              ? '${report.synced} process(es) synced. '
+                  '${report.waitingForMasterData} process(es) are waiting for '
+                  'master data reactivation.'
+              : report.hasErrors && _pendingSyncCount > 0
+                  ? '${report.synced} process(es) synced. '
+                      '$_pendingSyncCount process(es) remain saved on this '
+                      'device. KINTA will retry automatically. '
+                      'Open Process Records for details.'
+                  : report.hasErrors
+                      ? 'Sync encountered an error. Check Process Records '
+                          'to confirm the saved record status.'
+                      : report.synced == 0
+                          ? 'No pending processes to sync.'
+                          : '${report.synced} process(es) synced successfully.';
       if (!silent) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (mounted) {
@@ -219,18 +251,44 @@ class _HomeWidgetState extends State<HomeWidget> with WidgetsBindingObserver {
               },
               icon: const Icon(Icons.logout, color: Colors.white),
             ),
-            TextButton.icon(
-              onPressed: _syncing ? null : _syncPendingProcesses,
-              icon: _syncing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.sync),
-              label: Text(
-                  _pendingSyncCount > 0 ? 'Sync ($_pendingSyncCount)' : 'Sync'),
-              style: TextButton.styleFrom(foregroundColor: Colors.white),
+            Tooltip(
+              message: _pendingSyncCount == 0 &&
+                      (_needsReviewCount > 0 ||
+                          _waitingForMasterDataCount > 0)
+                  ? 'Open local process records needing attention'
+                  : 'Synchronize pending processes',
+              child: TextButton.icon(
+                onPressed: _syncing
+                    ? null
+                    : _pendingSyncCount == 0 &&
+                            (_needsReviewCount > 0 ||
+                                _waitingForMasterDataCount > 0)
+                        ? _showOfflineRecords
+                        : _syncPendingProcesses,
+                icon: _syncing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(_pendingSyncCount == 0 &&
+                            (_needsReviewCount > 0 ||
+                                _waitingForMasterDataCount > 0)
+                        ? Icons.warning_amber_rounded
+                        : Icons.sync),
+                label: Text(
+                  _pendingSyncCount > 0
+                      ? 'Sync ($_pendingSyncCount)'
+                          '${_waitingForMasterDataCount > 0 ? ' | Waiting ($_waitingForMasterDataCount)' : ''}'
+                          '${_needsReviewCount > 0 ? ' | Review ($_needsReviewCount)' : ''}'
+                      : _waitingForMasterDataCount > 0
+                          ? 'Waiting ($_waitingForMasterDataCount)'
+                          : _needsReviewCount > 0
+                          ? 'Review ($_needsReviewCount)'
+                          : 'Sync',
+                ),
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+              ),
             ),
           ],
           centerTitle: false,

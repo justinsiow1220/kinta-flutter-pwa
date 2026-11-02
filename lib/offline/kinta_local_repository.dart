@@ -75,9 +75,18 @@ class KintaLocalRepository {
   static Future<List<Map<String, dynamic>>> readPendingLocalProcesses() async =>
       (await readAllLocalProcesses()).where(_needsSynchronization).toList();
   static Future<int> countPendingLocalProcesses() async => (await readPendingLocalProcesses()).length;
+  static Future<int> countConflictedLocalProcesses({required String actorUserId}) async =>
+      (await readAllLocalProcesses()).where((process) =>
+          process['sync_status'] == 'conflict' &&
+          process['actor_user_id']?.toString() == actorUserId).length;
+  static Future<int> countWaitingForMasterDataLocalProcesses({required String actorUserId}) async =>
+      (await readAllLocalProcesses()).where((process) =>
+          process['sync_status'] == 'waiting_for_master_data' &&
+          process['actor_user_id']?.toString() == actorUserId).length;
 
   static bool _needsSynchronization(Map<String, dynamic> p) {
-    if (p['sync_status'] == 'conflict') return false;
+    if (p['sync_status'] == 'conflict' ||
+        p['sync_status'] == 'waiting_for_master_data') return false;
     if (p['sync_pending'] == true || p['sync_status'] == 'pending' || p['server_process_id'] == null) return true;
     bool unsynced(List? rows) => (rows ?? []).whereType<Map>().any((r) => r['id'] == null && r['_sync_status'] != 'synced');
     if (unsynced(p['qc_inspections'] as List?) || unsynced(p['problems'] as List?)) return true;

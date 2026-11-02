@@ -87,7 +87,11 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
               size: 30.0,
             ),
             onPressed: () async {
-              context.pop();
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go(HomeWidget.routePath);
+              }
             },
           ),
           title: Text(

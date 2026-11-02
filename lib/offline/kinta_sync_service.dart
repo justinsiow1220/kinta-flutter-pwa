@@ -4,10 +4,17 @@ import '/kinta_process_draft.dart';
 import '/offline/kinta_local_repository.dart';
 
 class KintaSyncReport {
-  const KintaSyncReport({required this.synced, required this.errors});
+  const KintaSyncReport({
+    required this.synced,
+    required this.errors,
+    this.needsReview = 0,
+    this.waitingForMasterData = 0,
+  });
 
   final int synced;
   final List<String> errors;
+  final int needsReview;
+  final int waitingForMasterData;
 
   bool get hasErrors => errors.isNotEmpty;
 }
@@ -16,16 +23,119 @@ class KintaSyncReport {
 class KintaSyncService {
   KintaSyncService._();
 
-  static bool _isRunning = false;
+  static Future<KintaSyncReport>? _runningSync;
+  static DateTime? _lastMasterDataRetryCheckAt;
 
-  static Future<KintaSyncReport> syncPendingProcesses() async {
-    if (_isRunning) {
-      return const KintaSyncReport(
-          synced: 0, errors: ['A sync is already running.']);
+  static Future<int> retryWaitingProcessesWhenMasterDataIsActive({
+    required String actorUserId,
+  }) async {
+    final localProcesses = await KintaLocalRepository.readAllLocalProcesses();
+    final waiting = localProcesses.where((process) {
+      if (process['actor_user_id']?.toString() != actorUserId) return false;
+      final status = process['sync_status'];
+      final code = process['conflict_code'];
+      return (status == 'waiting_for_master_data' &&
+              ['MACHINE_INACTIVE', 'SECTOR_INACTIVE'].contains(code)) ||
+          (status == 'conflict' &&
+              code == 'HTTP_422' &&
+              process['sync_error'] ==
+                  'The selected machine or sector is no longer active.');
+    }).toList();
+    if (waiting.isEmpty) return 0;
+
+    final now = DateTime.now();
+    if (_lastMasterDataRetryCheckAt != null &&
+        now.difference(_lastMasterDataRetryCheckAt!) <
+            const Duration(seconds: 15)) {
+      return 0;
     }
-    if (!KintaAuthService.hasPermission('process.sync')) return const KintaSyncReport(synced: 0, errors: ['The saved offline grant is expired or does not allow sync. Sign in online to renew it.']);
-    _isRunning = true;
+    _lastMasterDataRetryCheckAt = now;
+
+    final needsMachineList = waiting.any((process) =>
+        process['conflict_code'] == 'MACHINE_INACTIVE' ||
+        process['conflict_code'] == 'HTTP_422');
+    final needsSectorList = waiting.any((process) =>
+        process['conflict_code'] == 'SECTOR_INACTIVE' ||
+        process['conflict_code'] == 'HTTP_422');
+    final results = await Future.wait<List<Map<String, dynamic>>>([
+      if (needsMachineList)
+        KintaApiService.getList(
+          'master-data/machines',
+          allowCachedOfflineFallback: false,
+        )
+      else
+        Future.value(<Map<String, dynamic>>[]),
+      if (needsSectorList)
+        KintaApiService.getList(
+          'master-data/sectors',
+          allowCachedOfflineFallback: false,
+        )
+      else
+        Future.value(<Map<String, dynamic>>[]),
+    ]);
+    final activeMachineIds = results[0]
+        .map((machine) => machine['id'].toString())
+        .toSet();
+    final activeSectorIds =
+        results[1].map((sector) => sector['id'].toString()).toSet();
+
+    var requeued = 0;
+    for (final process in waiting) {
+      final code = process['conflict_code'];
+      final isLegacyMachineOrSectorError = code == 'HTTP_422';
+      final machineReady = !needsMachineList ||
+          activeMachineIds.contains(process['machine_id']?.toString());
+      final sectorReady = !needsSectorList ||
+          activeSectorIds.contains(process['sector_id']?.toString());
+      final relevantMasterDataReady = isLegacyMachineOrSectorError
+          ? machineReady && sectorReady
+          : code == 'MACHINE_INACTIVE'
+              ? machineReady
+              : sectorReady;
+      if (!relevantMasterDataReady) continue;
+
+      await KintaLocalRepository.updateLocalProcess(
+        process['local_id'].toString(),
+        {
+          'sync_pending': true,
+          'sync_status': 'pending',
+          'sync_error': null,
+          'sync_retry_count': 0,
+          'next_sync_attempt_at': null,
+          'conflict_code': null,
+          'conflict_snapshot': null,
+          'conflict_detected_at': null,
+        },
+      );
+      requeued++;
+    }
+    return requeued;
+  }
+
+  static Future<KintaSyncReport> syncPendingProcesses({bool forceRetry = false}) {
+    if (!KintaAuthService.hasPermission('process.sync')) {
+      return Future.value(const KintaSyncReport(
+        synced: 0,
+        errors: [
+          'The saved offline grant is expired or does not allow sync. Sign in online to renew it.',
+        ],
+      ));
+    }
+
+    // Auto-retry and manual Sync callers share one result instead of
+    // reporting a misleading error when they overlap.
+    final runningSync = _runningSync;
+    if (runningSync != null) return runningSync;
+
+    final sync = _performSync(forceRetry: forceRetry);
+    _runningSync = sync;
+    return sync;
+  }
+
+  static Future<KintaSyncReport> _performSync({required bool forceRetry}) async {
     var synced = 0;
+    var needsReview = 0;
+    var waitingForMasterData = 0;
     final errors = <String>[];
     try {
       final pending = await KintaLocalRepository.readPendingLocalProcesses();
@@ -35,6 +145,8 @@ class KintaSyncService {
           errors.add('A pending local process is missing its local ID.');
           continue;
         }
+
+        if (!forceRetry && !_retryIsDue(process)) continue;
 
         final currentUserId = KintaAuthService.currentUser?['id']?.toString();
         if (currentUserId == null || process['actor_user_id']?.toString() != currentUserId) {
@@ -47,6 +159,7 @@ class KintaSyncService {
             'conflict_code': 'ACTOR_MISMATCH',
             'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
           });
+          needsReview++;
           continue;
         }
         final qcSource = _maps(process['qc_inspections']);
@@ -143,6 +256,9 @@ class KintaSyncService {
             'sync_status': 'synced',
             'sync_pending': false,
             'sync_error': null,
+            'sync_retry_count': 0,
+            'next_sync_attempt_at': null,
+            'last_sync_attempt_at': null,
             'synced_at': DateTime.now().toUtc().toIso8601String(),
             'end_sync_status':
                 completed ? 'synced' : process['end_sync_status'],
@@ -160,28 +276,61 @@ class KintaSyncService {
         } catch (error) {
           errors.add('Process $localId: $error');
           try {
-            if (error is KintaApiException && error.statusCode == 409) {
+            if (error is KintaApiException &&
+                ['MACHINE_INACTIVE', 'SECTOR_INACTIVE']
+                    .contains(error.errorCode)) {
+              await KintaLocalRepository.updateLocalProcess(localId, {
+                'sync_pending': false,
+                'sync_status': 'waiting_for_master_data',
+                'sync_error': error.message,
+                'conflict_code': error.errorCode,
+                'conflict_snapshot': error.data ?? <String, dynamic>{},
+                'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
+                'sync_retry_count': 0,
+                'next_sync_attempt_at': null,
+              });
+              waitingForMasterData++;
+            } else if (error is KintaApiException && _requiresReview(error)) {
               await KintaLocalRepository.updateLocalProcess(localId, {
                 'sync_pending': false,
                 'sync_status': 'conflict',
                 'sync_error': error.message,
+                'conflict_code': error.errorCode ?? 'HTTP_${error.statusCode}',
                 'conflict_snapshot': error.data ?? <String, dynamic>{},
                 'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
+                'sync_retry_count': 0,
+                'next_sync_attempt_at': null,
               });
+              needsReview++;
             } else {
+              final retryCount =
+                  (_asInt(process['sync_retry_count']) ?? 0) + 1;
+              final exponent = (retryCount - 1).clamp(0, 5).toInt();
+              final delaySeconds =
+                  (10 * (1 << exponent)).clamp(10, 300).toInt();
+              final attemptedAt = DateTime.now().toUtc();
               await KintaLocalRepository.updateLocalProcess(localId, {
                 'sync_pending': true,
                 'sync_status': 'pending',
                 'sync_error': error.toString(),
-                'last_sync_attempt_at': DateTime.now().toUtc().toIso8601String(),
+                'sync_retry_count': retryCount,
+                'last_sync_attempt_at': attemptedAt.toIso8601String(),
+                'next_sync_attempt_at': attemptedAt
+                    .add(Duration(seconds: delaySeconds))
+                    .toIso8601String(),
               });
             }
           } catch (_) {}
         }
       }
-      return KintaSyncReport(synced: synced, errors: errors);
+      return KintaSyncReport(
+        synced: synced,
+        errors: errors,
+        needsReview: needsReview,
+        waitingForMasterData: waitingForMasterData,
+      );
     } finally {
-      _isRunning = false;
+      _runningSync = null;
     }
   }
 
@@ -191,8 +340,26 @@ class KintaSyncService {
           .map((row) => Map<String, dynamic>.from(row))
           .toList();
 
+  static bool _requiresReview(KintaApiException error) {
+    final status = error.statusCode;
+    // Timeouts, throttling, and server errors can recover, so keep them queued.
+    if (status == 408 || status == 425 || status == 429 || status >= 500) {
+      return false;
+    }
+
+    // Other 4xx responses and explicit API error codes need review/fixing.
+    return (status >= 400 && status < 500) || error.errorCode != null;
+  }
+
   static int? _asInt(Object? value) =>
       value is int ? value : int.tryParse(value?.toString() ?? '');
+
+  static bool _retryIsDue(Map<String, dynamic> process) {
+    final nextAttempt = DateTime.tryParse(
+      process['next_sync_attempt_at']?.toString() ?? '',
+    );
+    return nextAttempt == null || !DateTime.now().toUtc().isBefore(nextAttempt);
+  }
 }
 
 

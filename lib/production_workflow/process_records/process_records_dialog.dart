@@ -80,6 +80,7 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
               (serverId == null ||
                   !serverIds.contains(serverId) ||
                   row['sync_status'] == 'conflict' ||
+                  row['sync_status'] == 'waiting_for_master_data' ||
                   row['sync_pending'] == true);
         }).toList();
       });
@@ -96,6 +97,7 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
                   row['server_record_archived'] != true &&
                   (row['server_process_id'] == null ||
                       row['sync_status'] == 'conflict' ||
+                      row['sync_status'] == 'waiting_for_master_data' ||
                       row['sync_pending'] == true))
               .toList());
         }
@@ -406,28 +408,46 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
     );
   }
 
-  Widget _localTile(Map<String, dynamic> row, {required bool allowDelete}) =>
-      Card(
-        margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        child: ListTile(
-          title: Text(
-            '${row['activity_name'] ?? 'Process'} - Local ${row['local_id']}',
-          ),
-          subtitle: Text(
-            'Status: ${row['sync_status'] ?? 'pending'}${row['sync_error'] == null ? '' : '\n${row['sync_error']}'}\n'
-            'Machine: ${row['machine_name'] ?? 'Unknown'} - Sector: ${row['sector_name'] ?? 'Unknown'}\n'
-            'Started: ${KintaTime.formatLocal(row['started_at'], assumeLocalWhenUnmarked: true, empty: 'Unknown')}\n'
-            'Passed: ${row['qty_passed'] ?? 'Not entered'} - Rejected: ${row['qty_rejected'] ?? 'Not entered'}',
-          ),
-          trailing: allowDelete && row['server_process_id'] == null
-              ? IconButton(
-                  tooltip: 'Delete local unsynced record',
-                  onPressed: () => _deleteLocalRecord(row),
-                  icon: const Icon(Icons.delete_outline),
-                )
-              : null,
+  Widget _localTile(Map<String, dynamic> row, {required bool allowDelete}) {
+    final needsReview = row['sync_status'] == 'conflict';
+    final retryAt = row['next_sync_attempt_at'];
+    final retryCount = int.tryParse(row['sync_retry_count']?.toString() ?? '');
+    final waitingForMachine = row['conflict_code'] == 'MACHINE_INACTIVE';
+    final waitingForSector = row['conflict_code'] == 'SECTOR_INACTIVE';
+    final syncStatus = row['sync_status'] == 'waiting_for_master_data'
+        ? waitingForMachine
+            ? 'Waiting for machine reactivation'
+            : waitingForSector
+                ? 'Waiting for sector reactivation'
+                : 'Waiting for master data reactivation'
+        : needsReview
+            ? 'Needs review'
+            : row['sync_status']?.toString() ?? 'Pending sync';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: ListTile(
+        title: Text(
+          '${row['activity_name'] ?? 'Process'} - Local ${row['local_id']}',
         ),
-      );
+        subtitle: Text(
+          'Status: $syncStatus'
+          '${row['sync_error'] == null ? '' : '\n${row['sync_error']}'}'
+          '${retryAt == null ? '' : '\nAutomatic retry${retryCount == null ? '' : ' #$retryCount'} scheduled: ${KintaTime.formatLocal(retryAt)}'}\n'
+          'Machine: ${row['machine_name'] ?? 'Unknown'} - Sector: ${row['sector_name'] ?? 'Unknown'}\n'
+          'Started: ${KintaTime.formatLocal(row['started_at'], assumeLocalWhenUnmarked: true, empty: 'Unknown')}\n'
+          'Passed: ${row['qty_passed'] ?? 'Not entered'} - Rejected: ${row['qty_rejected'] ?? 'Not entered'}',
+        ),
+        trailing: allowDelete && row['server_process_id'] == null
+            ? IconButton(
+                tooltip: 'Delete local unsynced record',
+                onPressed: () => _deleteLocalRecord(row),
+                icon: const Icon(Icons.delete_outline),
+              )
+            : null,
+      ),
+    );
+  }
 }
 
 class _SectionHeader extends StatelessWidget {
