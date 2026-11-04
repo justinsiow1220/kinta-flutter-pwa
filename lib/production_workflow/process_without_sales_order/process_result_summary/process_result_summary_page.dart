@@ -7,7 +7,6 @@ import '/kinta_process_draft.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
 import 'dart:ui';
 import '/index.dart';
-import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -43,8 +42,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
     )..addListener(() => safeSetState(() {}));
 
     _model.textController ??= TextEditingController(
-        text:
-            'Description description description  description description description description description ');
+        text: KintaProcessDraft.instance.activityDescription ?? '');
     _model.textFieldFocusNode ??= FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
@@ -544,7 +542,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                     ),
                                                                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                                                                     child: Text(
-                                                                                      'Activity 8',
+                                                                                      KintaProcessDraft.instance.activityLabel ?? 'Activity',
                                                                                       style: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                             font: GoogleFonts.manrope(
                                                                                               fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -628,11 +626,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                     child: TextFormField(
                                                                                       controller: _model.textController,
                                                                                       focusNode: _model.textFieldFocusNode,
-                                                                                      onChanged: (_) => EasyDebounce.debounce(
-                                                                                        '_model.textController',
-                                                                                        const Duration(milliseconds: 2000),
-                                                                                        () => safeSetState(() {}),
-                                                                                      ),
+                                                                                      readOnly: true,
                                                                                       autofocus: false,
                                                                                       enabled: true,
                                                                                       obscureText: false,
@@ -687,19 +681,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                         filled: true,
                                                                                         fillColor: FlutterFlowTheme.of(context).secondaryBackground,
                                                                                         contentPadding: const EdgeInsets.all(22.0),
-                                                                                        suffixIcon: _model.textController!.text.isNotEmpty
-                                                                                            ? InkWell(
-                                                                                                onTap: () async {
-                                                                                                  _model.textController?.clear();
-                                                                                                  safeSetState(() {});
-                                                                                                },
-                                                                                                child: Icon(
-                                                                                                  Icons.clear,
-                                                                                                  color: FlutterFlowTheme.of(context).secondaryText,
-                                                                                                  size: 22.0,
-                                                                                                ),
-                                                                                              )
-                                                                                            : null,
+                                                                                        suffixIcon: null,
                                                                                       ),
                                                                                       style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                             font: GoogleFonts.inter(

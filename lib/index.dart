@@ -13,6 +13,8 @@ export '/account/change_password/change_password_widget.dart'
 export '/production_workflow/machine_selection/machine_selection_page.dart' show HomeWidget;
 export '/production_workflow/sales_order_scan/sales_order_scan_page.dart'
     show ScanSalesOrderWidget;
+export '/production_workflow/sales_order_scan/manual_sales_order_page.dart'
+    show ManualSalesOrderWidget;
 export '/production_workflow/process_with_sales_order/process_setup/process_setup_page.dart'
     show ProcesswScan0Widget;
 export '/production_workflow/process_with_sales_order/process_start/process_start_page.dart'

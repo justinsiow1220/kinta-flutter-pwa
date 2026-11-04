@@ -1,4 +1,5 @@
-import '/components/process_result_without_sales_order_dialog.dart';
+import '/components/process_end_widget.dart';
+import '/components/change_pic_dialog.dart';
 import '/kinta_process_draft.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
@@ -6,7 +7,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
-import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -42,8 +42,7 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
     )..addListener(() => safeSetState(() {}));
 
     _model.textController ??= TextEditingController(
-        text:
-            'Description description description  description description description description description ');
+        text: KintaProcessDraft.instance.activityDescription ?? '');
     _model.textFieldFocusNode ??= FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
@@ -538,7 +537,7 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
                                                                                     ),
                                                                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                                                                     child: Text(
-                                                                                      'Activity 8',
+                                                                                      KintaProcessDraft.instance.activityLabel ?? 'Activity',
                                                                                       style: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                             font: GoogleFonts.manrope(
                                                                                               fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -620,11 +619,7 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
                                                                                     child: TextFormField(
                                                                                       controller: _model.textController,
                                                                                       focusNode: _model.textFieldFocusNode,
-                                                                                      onChanged: (_) => EasyDebounce.debounce(
-                                                                                        '_model.textController',
-                                                                                        const Duration(milliseconds: 2000),
-                                                                                        () => safeSetState(() {}),
-                                                                                      ),
+                                                                                      readOnly: true,
                                                                                       autofocus: false,
                                                                                       enabled: true,
                                                                                       obscureText: false,
@@ -679,19 +674,7 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
                                                                                         filled: true,
                                                                                         fillColor: FlutterFlowTheme.of(context).secondaryBackground,
                                                                                         contentPadding: const EdgeInsets.all(22.0),
-                                                                                        suffixIcon: _model.textController!.text.isNotEmpty
-                                                                                            ? InkWell(
-                                                                                                onTap: () async {
-                                                                                                  _model.textController?.clear();
-                                                                                                  safeSetState(() {});
-                                                                                                },
-                                                                                                child: Icon(
-                                                                                                  Icons.clear,
-                                                                                                  color: FlutterFlowTheme.of(context).secondaryText,
-                                                                                                  size: 22.0,
-                                                                                                ),
-                                                                                              )
-                                                                                            : null,
+                                                                                        suffixIcon: null,
                                                                                       ),
                                                                                       style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                             font: GoogleFonts.inter(
@@ -891,15 +874,15 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () {
-                                                                                        print('Button pressed ...');
+                                                                                        context.pop();
                                                                                       },
-                                                                                      text: 'Change PIC',
+                                                                                      text: 'Cancel',
                                                                                       options: FFButtonOptions(
                                                                                         width: MediaQuery.sizeOf(context).width * 0.5,
                                                                                         height: 52.0,
                                                                                         padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
                                                                                         iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                                                                        color: FlutterFlowTheme.of(context).customColor2,
+                                                                                        color: FlutterFlowTheme.of(context).error,
                                                                                         textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                               font: GoogleFonts.manrope(
                                                                                                 fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -931,28 +914,17 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
+                                                                                        await showDialog<bool>(
                                                                                           context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: MediaQuery.sizeOf(context).height * 0.5,
-                                                                                                  child: const ProcessResult1Widget(),
-                                                                                                ),
-                                                                                              ),
-                                                                                            );
-                                                                                          },
-                                                                                        ).then((value) => safeSetState(() {}));
+                                                                                          builder: (_) => const Dialog(
+                                                                                            child: ProcessEndWidget(confirmationOnly: true),
+                                                                                          ),
+                                                                                        ).then((completed) async {
+                                                                                          safeSetState(() {});
+                                                                                          if (completed == true && mounted) {
+                                                                                            await context.pushNamed('ProcessxScan3');
+                                                                                          }
+                                                                                        });
                                                                                       },
                                                                                       text: 'Process End',
                                                                                       options: FFButtonOptions(
@@ -983,6 +955,40 @@ class _ProcessxScan2WidgetState extends State<ProcessxScan2Widget>
                                                                               ),
                                                                             ),
                                                                           ],
+                                                                        ),
+                                                                      ),
+                                                                      Padding(
+                                                                        padding: const EdgeInsetsDirectional.fromSTEB(0.0, 8.0, 0.0, 8.0),
+                                                                        child: Center(
+                                                                          child: FFButtonWidget(
+                                                                            onPressed: () async {
+                                                                              await showDialog<void>(
+                                                                                context: context,
+                                                                                builder: (_) => const ChangePICWidget(),
+                                                                              );
+                                                                            },
+                                                                            text: 'Change PIC',
+                                                                            options: FFButtonOptions(
+                                                                              width: MediaQuery.sizeOf(context).width * 0.6,
+                                                                              height: 52.0,
+                                                                              padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
+                                                                              iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
+                                                                              color: FlutterFlowTheme.of(context).customColor2,
+                                                                              textStyle: FlutterFlowTheme.of(context).titleSmall.override(
+                                                                                font: GoogleFonts.manrope(
+                                                                                  fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
+                                                                                  fontStyle: FlutterFlowTheme.of(context).titleSmall.fontStyle,
+                                                                                ),
+                                                                                color: Colors.white,
+                                                                                letterSpacing: 0.0,
+                                                                                fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
+                                                                                fontStyle: FlutterFlowTheme.of(context).titleSmall.fontStyle,
+                                                                              ),
+                                                                              elevation: 3.0,
+                                                                              borderSide: const BorderSide(width: 0.0),
+                                                                              borderRadius: BorderRadius.circular(10.0),
+                                                                            ),
+                                                                          ),
                                                                         ),
                                                                       ),
                                                                     ],

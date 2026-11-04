@@ -44,6 +44,36 @@ class KintaAuthService {
     return _currentUser!;
   }
 
+  /// Verifies an incoming supervisor without replacing the current session.
+  /// The caller activates the verified session after the handoff is committed.
+  static Future<Map<String, dynamic>> verifySupervisorLoginForHandoff({
+    required String username,
+    required String password,
+  }) async {
+    final result = await KintaApiService.postJson(
+      'auth/login',
+      {'username': username.trim().toLowerCase(), 'password': password},
+      authenticated: false,
+    );
+    final token = result['offline_grant'];
+    final claims = token is String ? await _verifyGrant(token) : null;
+    final responseUser = result['user'];
+    final responseUserId = responseUser is Map
+        ? int.tryParse(responseUser['id']?.toString() ?? '')
+        : null;
+    if (claims == null || responseUserId != claims['user_id']) {
+      throw const FormatException('The supervisor login returned an invalid access grant.');
+    }
+    return result;
+  }
+
+  static Future<Map<String, dynamic>> activateVerifiedHandoffSession(
+    Map<String, dynamic> verifiedLogin,
+  ) async {
+    await _acceptOnlineAuth(verifiedLogin);
+    return _currentUser!;
+  }
+
   static Future<void> _acceptOnlineAuth(Map<String, dynamic> response) async {
     final token = response['offline_grant'];
     if (token is! String) throw const FormatException('CI4 did not return the signed offline access grant.');

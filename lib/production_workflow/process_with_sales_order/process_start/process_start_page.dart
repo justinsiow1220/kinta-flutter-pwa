@@ -1,5 +1,3 @@
-import '/index.dart' show ScanSalesOrderWidget;
-import '/components/change_pic_dialog.dart';
 import '/components/process_started_with_sales_order_dialog.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
 import '/kinta_api_service.dart';
@@ -36,6 +34,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
   late ProcesswScan1Model _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  final _activityDescriptionController = TextEditingController();
   bool _isStartingProcess = false;
 
   @override
@@ -49,11 +48,15 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
       initialIndex: 1,
     )..addListener(() => safeSetState(() {}));
 
+    _activityDescriptionController.text =
+        KintaProcessDraft.instance.activityDescription ?? '';
+
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
   @override
   void dispose() {
+    _activityDescriptionController.dispose();
     _model.dispose();
 
     super.dispose();
@@ -64,7 +67,8 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
     required int? serverProcessId,
     required String startedAt,
   }) {
-    if (!KintaAuthService.hasPermission('process.write')) throw StateError('Your offline grant does not permit process creation.');
+    if (!KintaAuthService.hasPermission('process.write'))
+      throw StateError('Your offline grant does not permit process creation.');
     return {
       'server_process_id': serverProcessId,
       'actor_user_id': KintaAuthService.currentUser?['id'],
@@ -76,6 +80,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
       'sector_name': draft.sectorLabel,
       'activity_id': draft.activityId,
       'activity_name': draft.activityLabel,
+      'description': draft.activityDescription,
       'sales_order_id': draft.salesOrderId,
       'so_number': draft.soNumber,
       'customer_name': draft.customerName,
@@ -181,7 +186,8 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Text(
-                                          DateFormat('d MMMM yyyy').format(DateTime.now()),
+                                          DateFormat('d MMMM yyyy')
+                                              .format(DateTime.now()),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -202,7 +208,9 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                               ),
                                         ),
                                         Text(
-                                          DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
+                                          DateFormat('hh:mm a')
+                                              .format(DateTime.now())
+                                              .toLowerCase(),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -788,550 +796,29 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                         padding: const EdgeInsetsDirectional
                                                                             .fromSTEB(
                                                                             0.0,
-                                                                            5.0,
+                                                                            8.0,
                                                                             0.0,
                                                                             10.0),
                                                                         child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
                                                                             Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Total Processed: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '${KintaProcessDraft.instance.totalProcessed} / ${KintaProcessDraft.instance.batchQty ?? '-'} unit',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
                                                                           crossAxisAlignment:
                                                                               CrossAxisAlignment.start,
                                                                           children: [
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Divider(
-                                                                                    thickness: 2.0,
-                                                                                    color: FlutterFlowTheme.of(context).customColor1,
-                                                                                  ),
-                                                                                ],
+                                                                            Text(
+                                                                              'Description',
+                                                                              style: FlutterFlowTheme.of(context).bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                                                                            ),
+                                                                            const SizedBox(height: 6.0),
+                                                                            TextFormField(
+                                                                              controller: _activityDescriptionController,
+                                                                              minLines: 2,
+                                                                              maxLines: 4,
+                                                                              decoration: const InputDecoration(
+                                                                                hintText: 'Enter a description for this activity',
+                                                                                border: OutlineInputBorder(),
+                                                                                isDense: true,
                                                                               ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                   'Batch Qty:',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '${KintaProcessDraft.instance.batchQty ?? '-'} unit',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Process Started: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '-',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Process Ended: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '-',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Divider(
-                                                                                    thickness: 2.0,
-                                                                                    color: FlutterFlowTheme.of(context).customColor1,
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Qty Passed: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '-',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Qty Rejected: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '-',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Problem: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '-',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            0.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Column(
-                                                                              mainAxisSize: MainAxisSize.max,
-                                                                              mainAxisAlignment: MainAxisAlignment.start,
-                                                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                                                              children: [
-                                                                                Text(
-                                                                                  'Remarks: ',
-                                                                                  style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                        font: GoogleFonts.inter(
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                        color: FlutterFlowTheme.of(context).primaryText,
-                                                                                        letterSpacing: 0.0,
-                                                                                        fontWeight: FontWeight.w600,
-                                                                                        fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                      ),
-                                                                                ),
-                                                                              ],
-                                                                            ),
-                                                                            Expanded(
-                                                                              child: Column(
-                                                                                mainAxisSize: MainAxisSize.max,
-                                                                                mainAxisAlignment: MainAxisAlignment.start,
-                                                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                                                children: [
-                                                                                  Text(
-                                                                                    '-',
-                                                                                    style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                          font: GoogleFonts.inter(
-                                                                                            fontWeight: FontWeight.w600,
-                                                                                            fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                          ),
-                                                                                          color: FlutterFlowTheme.of(context).primaryText,
-                                                                                          letterSpacing: 0.0,
-                                                                                          fontWeight: FontWeight.w600,
-                                                                                          fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
-                                                                                        ),
-                                                                                  ),
-                                                                                ],
-                                                                              ),
+                                                                              onChanged: (value) => KintaProcessDraft.instance.activityDescription = value,
                                                                             ),
                                                                           ],
                                                                         ),
@@ -1347,10 +834,6 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                             Row(
                                                                           mainAxisSize:
                                                                               MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
                                                                           children: [
                                                                             Expanded(
                                                                               child: Padding(
@@ -1362,15 +845,15 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
-                                                                                        await context.pushNamed(ScanSalesOrderWidget.routeName);
+                                                                                        context.pop();
                                                                                       },
-                                                                                      text: 'Rescan',
+                                                                                      text: 'Cancel',
                                                                                       options: FFButtonOptions(
                                                                                         width: MediaQuery.sizeOf(context).width * 0.5,
                                                                                         height: 52.0,
                                                                                         padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
                                                                                         iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                                                                        color: FlutterFlowTheme.of(context).primary,
+                                                                                        color: FlutterFlowTheme.of(context).error,
                                                                                         textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                               font: GoogleFonts.manrope(
                                                                                                 fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -1417,18 +900,13 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Return to setup and select machine, sector, activity, and supervisor.')));
                                                                                                 return;
                                                                                               }
-                                                                                              final startConfirmed = await showDialog<bool>(
+                                                                                              final confirmed = await showDialog<bool>(
                                                                                                 context: context,
-                                                                                                builder: (dialogContext) => AlertDialog(
-                                                                                                  title: const Text('Start this process?'),
-                                                                                                  content: Text('Machine: ${draft.machineLabel ?? '-'}\nActivity: ${draft.activityLabel ?? '-'}\nSupervisor: ${draft.supervisorName ?? '-'}'),
-                                                                                                  actions: [
-                                                                                                    TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-                                                                                                    ElevatedButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Start Process')),
-                                                                                                  ],
+                                                                                                builder: (_) => const Dialog(
+                                                                                                  child: ProcessStartedWidget(),
                                                                                                 ),
                                                                                               );
-                                                                                              if (startConfirmed != true) return;
+                                                                                              if (confirmed != true || !mounted) return;
                                                                                               setState(() => _isStartingProcess = true);
                                                                                               draft.processId = null;
                                                                                               draft.localProcessId = null;
@@ -1443,7 +921,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                                   'current_supervisor_id': draft.supervisorId,
                                                                                                   'sales_order_id': draft.salesOrderId,
                                                                                                   'operator_ids': draft.operatorIds.toList(),
-                                                                                                  'description': null,
+                                                                                                  'description': draft.activityDescription,
                                                                                                 });
                                                                                                 draft.processId = int.tryParse(data['id'].toString());
                                                                                                 try {
@@ -1490,30 +968,11 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                                 if (mounted) setState(() => _isStartingProcess = false);
                                                                                               }
                                                                                               if (!mounted) return;
-                                                                                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(startMessage)));
+                                                                                              if (startMessage.startsWith('CI4 is unreachable')) {
+                                                                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(startMessage)));
+                                                                                              }
                                                                                               if (!mounted) return;
-                                                                                              await showModalBottomSheet(
-                                                                                                isScrollControlled: true,
-                                                                                                backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                                enableDrag: false,
-                                                                                                useSafeArea: true,
-                                                                                                context: context,
-                                                                                                builder: (context) {
-                                                                                                  return GestureDetector(
-                                                                                                    onTap: () {
-                                                                                                      FocusScope.of(context).unfocus();
-                                                                                                      FocusManager.instance.primaryFocus?.unfocus();
-                                                                                                    },
-                                                                                                    child: Padding(
-                                                                                                      padding: MediaQuery.viewInsetsOf(context),
-                                                                                                      child: SizedBox(
-                                                                                                        height: 200.0,
-                                                                                                        child: const ProcessStartedWidget(),
-                                                                                                      ),
-                                                                                                    ),
-                                                                                                  );
-                                                                                                },
-                                                                                              ).then((value) => safeSetState(() {}));
+                                                                                              context.pushNamed('ProcesswScan2');
                                                                                             },
                                                                                       text: _isStartingProcess ? 'Starting...' : 'Process Start',
                                                                                       options: FFButtonOptions(
@@ -1522,86 +981,6 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                         padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
                                                                                         iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
                                                                                         color: FlutterFlowTheme.of(context).success,
-                                                                                        textStyle: FlutterFlowTheme.of(context).titleSmall.override(
-                                                                                              font: GoogleFonts.manrope(
-                                                                                                fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
-                                                                                                fontStyle: FlutterFlowTheme.of(context).titleSmall.fontStyle,
-                                                                                              ),
-                                                                                              color: Colors.white,
-                                                                                              letterSpacing: 0.0,
-                                                                                              fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
-                                                                                              fontStyle: FlutterFlowTheme.of(context).titleSmall.fontStyle,
-                                                                                            ),
-                                                                                        elevation: 3.0,
-                                                                                        borderSide: const BorderSide(
-                                                                                          width: 0.0,
-                                                                                        ),
-                                                                                        borderRadius: BorderRadius.circular(10.0),
-                                                                                      ),
-                                                                                    ),
-                                                                                  ],
-                                                                                ),
-                                                                              ),
-                                                                            ),
-                                                                          ],
-                                                                        ),
-                                                                      ),
-                                                                      Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
-                                                                            0.0,
-                                                                            10.0,
-                                                                            0.0,
-                                                                            10.0),
-                                                                        child:
-                                                                            Row(
-                                                                          mainAxisSize:
-                                                                              MainAxisSize.max,
-                                                                          mainAxisAlignment:
-                                                                              MainAxisAlignment.start,
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
-                                                                          children: [
-                                                                            Expanded(
-                                                                              child: Padding(
-                                                                                padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
-                                                                                child: Column(
-                                                                                  mainAxisSize: MainAxisSize.max,
-                                                                                  mainAxisAlignment: MainAxisAlignment.start,
-                                                                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                                                                  children: [
-                                                                                    FFButtonWidget(
-                                                                                      onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
-                                                                                          context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: MediaQuery.sizeOf(context).height * 1.0,
-                                                                                                  child: const ChangePICWidget(),
-                                                                                                ),
-                                                                                              ),
-                                                                                            );
-                                                                                          },
-                                                                                        ).then((value) => safeSetState(() {}));
-                                                                                      },
-                                                                                      text: 'Change PIC',
-                                                                                      options: FFButtonOptions(
-                                                                                        width: MediaQuery.sizeOf(context).width * 0.5,
-                                                                                        height: 52.0,
-                                                                                        padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
-                                                                                        iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                                                                        color: FlutterFlowTheme.of(context).customColor2,
                                                                                         textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                               font: GoogleFonts.manrope(
                                                                                                 fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -1661,5 +1040,3 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
     );
   }
 }
-
-

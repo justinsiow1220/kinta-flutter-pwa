@@ -1,4 +1,3 @@
-import '/components/process_end_widget.dart';
 import '/components/process_result_with_sales_order_dialog.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_drop_down.dart';
@@ -36,13 +35,22 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
   List<Map<String, dynamic>> _problems = [];
+  final Set<int> _attachedProblemIds = <int>{};
   bool _problemsLoading = true;
   bool _submittingProblems = false;
   String? _problemsError;
   List<String> get _problemValues =>
-      _problems.map((row) => row['id'].toString()).toList();
+      _problems
+          .where((row) =>
+              !_attachedProblemIds.contains(int.tryParse(row['id'].toString())))
+          .map((row) => row['id'].toString())
+          .toList();
   List<String> get _problemLabels =>
-      _problems.map((row) => '${row['code']} - ${row['name']}').toList();
+      _problems
+          .where((row) =>
+              !_attachedProblemIds.contains(int.tryParse(row['id'].toString())))
+          .map((row) => '${row['code']} - ${row['name']}')
+          .toList();
 
   @override
   void initState() {
@@ -80,12 +88,61 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
     });
     try {
       final rows = await KintaApiService.getList('master-data/problems');
-      if (mounted) setState(() => _problems = rows);
+      final attachedIds = await _loadAttachedProblemIds();
+      if (mounted) {
+        setState(() {
+          _problems = rows;
+          _attachedProblemIds
+            ..clear()
+            ..addAll(attachedIds);
+          final selections = (_model.dropDownValue ?? [])
+              .where((value) =>
+                  !_attachedProblemIds.contains(int.tryParse(value)))
+              .toList();
+          _model.dropDownValue = selections;
+          _model.dropDownValueController?.value = selections;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _problemsError = error.toString());
     } finally {
       if (mounted) setState(() => _problemsLoading = false);
     }
+  }
+
+  Future<Set<int>> _loadAttachedProblemIds() async {
+    final draft = KintaProcessDraft.instance;
+    final ids = <int>{};
+    List<dynamic> rows = [];
+    if (draft.processId != null) {
+      try {
+        final process =
+            await KintaApiService.getMap('processes/${draft.processId}');
+        if (process['problems'] is List) {
+          rows = process['problems'] as List;
+        }
+      } catch (_) {
+        // Use the local process copy if the server cannot be reached.
+      }
+    }
+    if (draft.localProcessId != null) {
+      try {
+        final local = await KintaLocalRepository.readLocalProcess(
+          draft.localProcessId!,
+        );
+        final localRows = local?['problems'];
+        if (localRows is List) rows = [...rows, ...localRows];
+      } catch (_) {
+        // The server list, if available, is still enough to filter choices.
+      }
+    }
+    for (final row in rows.whereType<Map>()) {
+      final id = int.tryParse(
+        (row['problem_id'] ?? row['id']).toString(),
+      );
+      if (id != null) ids.add(id);
+    }
+    return ids;
   }
 
   @override
@@ -1422,7 +1479,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                         multiSelectController: _model.dropDownValueController ??= FormListFieldController<String>(null),
                                                                                         options: _problemValues,
                                                                                         optionLabels: _problemLabels,
-                                                                                        disabled: _problemsLoading || _problems.isEmpty,
+                                                                                        disabled: _problemsLoading || _problemValues.isEmpty,
                                                                                         width: double.infinity,
                                                                                         height: 54.0,
                                                                                         searchHintTextStyle: FlutterFlowTheme.of(context).labelMedium.override(
@@ -1659,24 +1716,32 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select at least one problem before submitting.')));
                                                                                                 return;
                                                                                               }
-                                                                                              final submitConfirmed = await showDialog<bool>(
+                                                                                              final idsToSubmit = ids.where((id) => !_attachedProblemIds.contains(id)).toList();
+                                                                                              if (idsToSubmit.isEmpty) {
+                                                                                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('The selected problems are already attached to this process.')));
+                                                                                                return;
+                                                                                              }
+                                                                                              final selectedProblems = _problems
+                                                                                                  .where((problem) => ids.contains(int.tryParse(problem['id'].toString())))
+                                                                                                  .toList();
+                                                                                              final previewConfirmed = await showDialog<bool>(
                                                                                                 context: context,
-                                                                                                builder: (dialogContext) => AlertDialog(
-                                                                                                  title: const Text('Submit process problems?'),
-                                                                                                  content: Text('Save ${ids.length} selected problem(s) to ${processId == null ? 'this device' : 'process #$processId'}?'),
-                                                                                                  actions: [
-                                                                                                    TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('Cancel')),
-                                                                                                    ElevatedButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Submit')),
-                                                                                                  ],
+                                                                                                builder: (_) => Dialog(
+                                                                                                  child: ProcessResultWidget(
+                                                                                                    qtyPassed: _model.textController1?.text ?? '',
+                                                                                                    qtyRejected: _model.textController2?.text ?? '',
+                                                                                                    problems: selectedProblems,
+                                                                                                    remarks: _model.textController3?.text ?? '',
+                                                                                                  ),
                                                                                                 ),
                                                                                               );
-                                                                                              if (submitConfirmed != true) return;
+                                                                                              if (previewConfirmed != true || !mounted) return;
                                                                                               setState(() => _submittingProblems = true);
                                                                                               var offline = processId == null;
                                                                                               try {
                                                                                                 if (processId != null) {
                                                                                                   try {
-                                                                                                    final saved = await KintaApiService.postJson('processes/$processId/problems', {'problem_ids': ids});
+                                                                                                    final saved = await KintaApiService.postJson('processes/$processId/problems', {'problem_ids': idsToSubmit});
                                                                                                     if (localId != null && saved['problems'] is List) {
                                                                                                       for (final item in (saved['problems'] as List).whereType<Map>()) {
                                                                                                         await KintaLocalRepository.appendLocalProcessItem(localId, 'problems', {
@@ -1691,7 +1756,7 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                                   }
                                                                                                 }
                                                                                                 if (offline) {
-                                                                                                  for (final id in ids) {
+                                                                                                  for (final id in idsToSubmit) {
                                                                                                     final problem = _problems.firstWhere((row) => int.tryParse(row['id'].toString()) == id, orElse: () => <String, dynamic>{});
                                                                                                     await KintaLocalRepository.appendLocalProcessItem(
                                                                                                         localId!,
@@ -1706,34 +1771,20 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                                   }
                                                                                                 }
                                                                                               } catch (error) {
-                                                                                                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not submit problems: $error')));
+                                                                                                if (error is KintaApiException && error.statusCode == 409) {
+                                                                                                  await _loadProblems();
+                                                                                                  if (mounted) {
+                                                                                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Some selected problems were already attached. The list has been refreshed; select the remaining problems and submit again.')));
+                                                                                                  }
+                                                                                                } else if (mounted) {
+                                                                                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not submit problems: $error')));
+                                                                                                }
                                                                                                 if (mounted) setState(() => _submittingProblems = false);
                                                                                                 return;
                                                                                               }
                                                                                               if (mounted) setState(() => _submittingProblems = false);
                                                                                               if (offline && mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Problems saved on this device; they are not on the server yet.')));
-                                                                                              await showModalBottomSheet(
-                                                                                                isScrollControlled: true,
-                                                                                                backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                                enableDrag: false,
-                                                                                                useSafeArea: true,
-                                                                                                context: context,
-                                                                                                builder: (context) {
-                                                                                                  return GestureDetector(
-                                                                                                    onTap: () {
-                                                                                                      FocusScope.of(context).unfocus();
-                                                                                                      FocusManager.instance.primaryFocus?.unfocus();
-                                                                                                    },
-                                                                                                    child: Padding(
-                                                                                                      padding: MediaQuery.viewInsetsOf(context),
-                                                                                                      child: SizedBox(
-                                                                                                        height: MediaQuery.sizeOf(context).height * 1.0,
-                                                                                                        child: const ProcessResultWidget(),
-                                                                                                      ),
-                                                                                                    ),
-                                                                                                  );
-                                                                                                },
-                                                                                              ).then((value) => safeSetState(() {}));
+                                                                                              if (mounted) await context.pushNamed('ProcesswScan5');
                                                                                             },
                                                                                       text: _submittingProblems ? 'Submitting...' : 'Submit',
                                                                                       options: FFButtonOptions(
@@ -1772,29 +1823,17 @@ class _ProcesswScan4WidgetState extends State<ProcesswScan4Widget>
                                                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                                                   children: [
                                                                                     FFButtonWidget(
-                                                                                      onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
-                                                                                          context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: 200.0,
-                                                                                                  child: const ProcessEndWidget(),
-                                                                                                ),
-                                                                                              ),
-                                                                                            );
-                                                                                          },
-                                                                                        ).then((value) => safeSetState(() {}));
+                                                                                      onPressed: () {
+                                                                                        FocusScope.of(context).unfocus();
+                                                                                        safeSetState(() {
+                                                                                          _model.textController1?.clear();
+                                                                                          _model.textController2?.clear();
+                                                                                          _model.textController3?.clear();
+                                                                                          _model.dropDownValue = <String>[];
+                                                                                          _model.dropDownValueController?.value = <String>[];
+                                                                                          KintaProcessDraft.instance.qtyPassed = null;
+                                                                                          KintaProcessDraft.instance.qtyRejected = null;
+                                                                                        });
                                                                                       },
                                                                                       text: 'Reset',
                                                                                       options: FFButtonOptions(

@@ -2,14 +2,16 @@ import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
+import 'dart:convert';
 import '/index.dart';
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import '/kinta_api_service.dart';
 import '/kinta_process_draft.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_code_vision/qr_code_vision.dart';
 import 'sales_order_scan_model.dart';
 export 'sales_order_scan_model.dart';
 
@@ -27,40 +29,117 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
   late ScanSalesOrderModel _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  List<Map<String, dynamic>> _salesOrders = [];
-  bool _salesOrdersLoading = true;
-  String? _salesOrderError;
+  final MobileScannerController _scannerController = MobileScannerController(
+    formats: const [BarcodeFormat.qrCode],
+  );
+  bool _handlingScan = false;
+  bool _pickingImage = false;
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => ScanSalesOrderModel());
 
-    _loadSalesOrders();
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
-  }
-
-  Future<void> _loadSalesOrders() async {
-    setState(() {
-      _salesOrdersLoading = true;
-      _salesOrderError = null;
-    });
-    try {
-      final rows = await KintaApiService.getList('master-data/sales-orders');
-      if (!mounted) return;
-      setState(() => _salesOrders = rows);
-    } catch (error) {
-      if (mounted) setState(() => _salesOrderError = error.toString());
-    } finally {
-      if (mounted) setState(() => _salesOrdersLoading = false);
-    }
   }
 
   @override
   void dispose() {
+    _scannerController.dispose();
     _model.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _handleQrCode(String value) async {
+    if (_handlingScan) return;
+    _handlingScan = true;
+    try {
+      final payload = jsonDecode(value);
+      if (payload is! Map) {
+        throw const FormatException(
+            'The QR code must contain a JSON sales order.');
+      }
+      final orderPayload = payload['sales_order'] is Map
+          ? Map<String, dynamic>.from(payload['sales_order'] as Map)
+          : Map<String, dynamic>.from(payload);
+      final soNumber = (orderPayload['so_number'] ??
+              orderPayload['sales_order_number'] ??
+              orderPayload['salesOrderNumber'])
+          ?.toString()
+          .trim();
+      final customerName = (orderPayload['customer_name'] ??
+              orderPayload['customer'] ??
+              orderPayload['customerName'])
+          ?.toString()
+          .trim();
+      final batchQty = int.tryParse(
+        (orderPayload['batch_qty'] ??
+                orderPayload['quantity'] ??
+                orderPayload['batchQty'])
+            .toString(),
+      );
+      if (soNumber == null || soNumber.isEmpty) {
+        throw const FormatException('The QR code is missing so_number.');
+      }
+      if (customerName == null || customerName.isEmpty) {
+        throw const FormatException('The QR code is missing customer_name.');
+      }
+      if (batchQty == null || batchQty < 1) {
+        throw const FormatException(
+            'The QR code must contain a positive batch_qty.');
+      }
+
+      final order = await KintaApiService.postJson(
+        'master-data/sales-orders',
+        {
+          'so_number': soNumber,
+          'customer_name': customerName,
+          'batch_qty': batchQty,
+        },
+      );
+
+      KintaProcessDraft.instance.prepareForNewProcess();
+      KintaProcessDraft.instance
+        ..salesOrderId = int.tryParse(order['id']?.toString() ?? '')
+        ..soNumber = order['so_number']?.toString()
+        ..customerName = order['customer_name']?.toString()
+        ..batchQty = int.tryParse(order['batch_qty']?.toString() ?? '');
+      KintaProcessDraft.instance.persistInBackground();
+      if (mounted) context.pushNamed(ProcesswScan0Widget.routeName);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      _handlingScan = false;
+    }
+  }
+
+  Future<void> _scanFromImage() async {
+    if (_pickingImage) return;
+    setState(() => _pickingImage = true);
+    try {
+      final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+      if (file == null) return;
+      final qrCode = QrCode();
+      qrCode.scanImageBytes(await file.readAsBytes());
+      final value = qrCode.content?.text;
+      if (value == null || value.trim().isEmpty) {
+        throw Exception('No QR code was found in that image.');
+      }
+      await _handleQrCode(value);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(error.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _pickingImage = false);
+    }
   }
 
   @override
@@ -134,78 +213,14 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                             mainAxisSize: MainAxisSize.max,
                             children: [
                               Padding(
-                                padding: const EdgeInsets.only(bottom: 14),
-                                child: Column(children: [
-                                  DropdownButtonFormField<int>(
-                                    initialValue: _salesOrders.any((row) =>
-                                            int.tryParse(
-                                                row['id'].toString()) ==
-                                            KintaProcessDraft
-                                                .instance.salesOrderId)
-                                        ? KintaProcessDraft
-                                            .instance.salesOrderId
-                                        : null,
-                                    decoration: const InputDecoration(
-                                        labelText: 'Sales Order (optional)',
-                                        border: OutlineInputBorder()),
-                                    hint: Text(_salesOrdersLoading
-                                        ? 'Loading sales orders...'
-                                        : 'Select sales order'),
-                                    items: _salesOrders
-                                        .map((row) => DropdownMenuItem<int>(
-                                              value: int.tryParse(
-                                                  row['id'].toString()),
-                                              child: Text(
-                                                  '${row['so_number']} - ${row['customer_name']}'),
-                                            ))
-                                        .where((item) => item.value != null)
-                                        .toList(),
-                                    onChanged: _salesOrdersLoading
-                                        ? null
-                                        : (id) {
-                                            final row = _salesOrders
-                                                .where((item) =>
-                                                    int.tryParse(item['id']
-                                                        .toString()) ==
-                                                    id)
-                                                .firstOrNull;
-                                            KintaProcessDraft.instance
-                                                .prepareForNewProcess();
-                                            setState(() {
-                                              KintaProcessDraft
-                                                  .instance.salesOrderId = id;
-                                              KintaProcessDraft
-                                                      .instance.soNumber =
-                                                  row?['so_number']?.toString();
-                                              KintaProcessDraft
-                                                      .instance.customerName =
-                                                  row?['customer_name']
-                                                      ?.toString();
-                                              KintaProcessDraft
-                                                      .instance.batchQty =
-                                                  int.tryParse(row?['batch_qty']
-                                                          ?.toString() ??
-                                                      '');
-                                              KintaProcessDraft.instance.persistInBackground();
-                                            });
-                                          },
-                                  ),
-                                  if (_salesOrderError != null)
-                                    TextButton.icon(
-                                        onPressed: _loadSalesOrders,
-                                        icon: const Icon(Icons.refresh),
-                                        label: const Text(
-                                            'Retry sales-order load')),
-                                ]),
-                              ),
-                              Padding(
                                 padding: const EdgeInsetsDirectional.fromSTEB(
                                     0.0, 0.0, 0.0, 15.0),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      DateFormat('d MMMM yyyy').format(DateTime.now()),
+                                      DateFormat('d MMMM yyyy')
+                                          .format(DateTime.now()),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -225,7 +240,9 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                                           ),
                                     ),
                                     Text(
-                                      DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
+                                      DateFormat('hh:mm a')
+                                          .format(DateTime.now())
+                                          .toLowerCase(),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -256,52 +273,79 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                               Column(
                                 mainAxisSize: MainAxisSize.max,
                                 children: [
-                                  Padding(
-                                    padding:
-                                        const EdgeInsetsDirectional.fromSTEB(
-                                            0.0, 0.0, 0.0, 15.0),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.max,
-                                      children: [
-                                        Expanded(
+                                  Container(
+                                    width: 300,
+                                    height: 300,
+                                    clipBehavior: Clip.antiAlias,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: MobileScanner(
+                                      controller: _scannerController,
+                                      errorBuilder: (context, error, child) {
+                                        final message =
+                                            switch (error.errorCode) {
+                                          MobileScannerErrorCode.unsupported =>
+                                            'No usable camera was found. Use “Scan from image” below.',
+                                          MobileScannerErrorCode
+                                                .permissionDenied =>
+                                            'Camera access is blocked. Allow camera access or use “Scan from image” below.',
+                                          _ =>
+                                            'Live scanning is unavailable. Use “Scan from image” below.',
+                                        };
+                                        return Center(
                                           child: Padding(
-                                            padding: const EdgeInsetsDirectional
-                                                .fromSTEB(0.0, 15.0, 0.0, 0.0),
+                                            padding: const EdgeInsets.all(20),
                                             child: Column(
-                                              mainAxisSize: MainAxisSize.max,
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                InkWell(
-                                                  splashColor:
-                                                      Colors.transparent,
-                                                  focusColor:
-                                                      Colors.transparent,
-                                                  hoverColor:
-                                                      Colors.transparent,
-                                                  highlightColor:
-                                                      Colors.transparent,
-                                                  onTap: () async {
-                                                    context.pushNamed(
-                                                        ProcesswScan0Widget
-                                                            .routeName);
-                                                  },
-                                                  child: ClipRRect(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8.0),
-                                                    child: Image.asset(
-                                                      'assets/images/barcode.jpg',
-                                                      width: double.infinity,
-                                                      height: 200.0,
-                                                      fit: BoxFit.contain,
-                                                    ),
+                                                const Icon(
+                                                  Icons.no_photography_outlined,
+                                                  color: Colors.white,
+                                                  size: 42,
+                                                ),
+                                                const SizedBox(height: 12),
+                                                Text(
+                                                  message,
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
                                                   ),
                                                 ),
                                               ],
                                             ),
                                           ),
-                                        ),
-                                      ],
+                                        );
+                                      },
+                                      onDetect: (capture) {
+                                        final value = capture.barcodes.isEmpty
+                                            ? null
+                                            : capture.barcodes.first.rawValue;
+                                        if (value != null) _handleQrCode(value);
+                                      },
                                     ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  OutlinedButton.icon(
+                                    onPressed:
+                                        _pickingImage ? null : _scanFromImage,
+                                    style: OutlinedButton.styleFrom(
+                                      minimumSize: const Size(240, 52),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    icon: _pickingImage
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.image_search),
+                                    label: const Text('Scan from image'),
                                   ),
                                   Padding(
                                     padding:
@@ -341,7 +385,7 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
                                                                           .sizeOf(
                                                                               context)
                                                                       .width *
-                                                                  1.0,
+                                                                  0.5,
                                                               height: 52.0,
                                                               padding:
                                                                   const EdgeInsetsDirectional

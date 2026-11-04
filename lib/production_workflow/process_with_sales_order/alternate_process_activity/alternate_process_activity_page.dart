@@ -130,7 +130,8 @@ class _ProcesswScan3WidgetState extends State<ProcesswScan3Widget>
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Text(
-                                          DateFormat('d MMMM yyyy').format(DateTime.now()),
+                                          DateFormat('d MMMM yyyy')
+                                              .format(DateTime.now()),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -151,7 +152,9 @@ class _ProcesswScan3WidgetState extends State<ProcesswScan3Widget>
                                               ),
                                         ),
                                         Text(
-                                          DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
+                                          DateFormat('hh:mm a')
+                                              .format(DateTime.now())
+                                              .toLowerCase(),
                                           style: FlutterFlowTheme.of(context)
                                               .titleMedium
                                               .override(
@@ -1314,27 +1317,19 @@ class _ProcesswScan3WidgetState extends State<ProcesswScan3Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
+                                                                                        await showDialog<void>(
                                                                                           context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: MediaQuery.sizeOf(context).height * 1.0,
-                                                                                                  child: const QCInspectionWidget(),
-                                                                                                ),
+                                                                                          builder: (dialogContext) => Dialog(
+                                                                                            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                                                                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                                                                            child: ConstrainedBox(
+                                                                                              constraints: BoxConstraints(
+                                                                                                maxWidth: 380,
+                                                                                                maxHeight: MediaQuery.sizeOf(dialogContext).height * 0.9,
                                                                                               ),
-                                                                                            );
-                                                                                          },
+                                                                                              child: const QCInspectionWidget(),
+                                                                                            ),
+                                                                                          ),
                                                                                         ).then((value) => safeSetState(() {}));
                                                                                       },
                                                                                       text: 'QC Inspection',
@@ -1375,27 +1370,11 @@ class _ProcesswScan3WidgetState extends State<ProcesswScan3Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
+                                                                                        await showDialog<bool>(
                                                                                           context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: MediaQuery.sizeOf(context).height * 0.8,
-                                                                                                  child: const ProcessEndWidget(),
-                                                                                                ),
-                                                                                              ),
-                                                                                            );
-                                                                                          },
+                                                                                          builder: (_) => const Dialog(
+                                                                                            child: ProcessEndWidget(confirmationOnly: true),
+                                                                                          ),
                                                                                         ).then((completed) async {
                                                                                           safeSetState(() {});
                                                                                           if (completed == true && mounted) await context.pushNamed(ProcesswScan4Widget.routeName);
@@ -1458,27 +1437,9 @@ class _ProcesswScan3WidgetState extends State<ProcesswScan3Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
+                                                                                        await showDialog<void>(
                                                                                           context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: MediaQuery.sizeOf(context).height * 1.0,
-                                                                                                  child: const ChangePICWidget(),
-                                                                                                ),
-                                                                                              ),
-                                                                                            );
-                                                                                          },
+                                                                                          builder: (_) => const ChangePICWidget(),
                                                                                         ).then((value) => safeSetState(() {}));
                                                                                       },
                                                                                       text: 'Change PIC',

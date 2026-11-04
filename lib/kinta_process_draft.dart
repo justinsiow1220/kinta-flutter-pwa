@@ -19,6 +19,7 @@ class KintaProcessDraft {
   String? machineLabel;
   String? sectorLabel;
   String? activityLabel;
+  String? activityDescription;
   String? supervisorName;
   List<String> operatorNames = [];
   Set<int> operatorIds = {};
@@ -37,6 +38,7 @@ class KintaProcessDraft {
     localProcessId = null;
     qtyPassed = null;
     qtyRejected = null;
+    activityDescription = null;
     // Draft selections are intentionally session-only and are not restored.
   }
 

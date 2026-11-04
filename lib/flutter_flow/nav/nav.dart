@@ -109,6 +109,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => const ScanSalesOrderWidget(),
         ),
         FFRoute(
+          name: ManualSalesOrderWidget.routeName,
+          path: ManualSalesOrderWidget.routePath,
+          builder: (context, params) => const ManualSalesOrderWidget(),
+        ),
+        FFRoute(
           name: ProcesswScan0Widget.routeName,
           path: ProcesswScan0Widget.routePath,
           builder: (context, params) => const ProcesswScan0Widget(),

@@ -6,6 +6,8 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
 import 'dart:ui';
 import '/index.dart';
+import '/kinta_api_service.dart';
+import '/kinta_process_draft.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -27,11 +29,37 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
   late ProcessxScan0Model _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  List<Map<String, dynamic>> _sectors = [];
+  List<Map<String, dynamic>> _activities = [];
+  List<Map<String, dynamic>> _operators = [];
+  bool _sectorsLoading = true;
+  bool _activitiesLoading = false;
+  bool _operatorsLoading = true;
+
+  List<String> get _sectorValues =>
+      _sectors.map((row) => row['id'].toString()).toList();
+  List<String> get _sectorLabels =>
+      _sectors.map((row) => row['name'].toString()).toList();
+  List<String> get _activityValues =>
+      _activities.map((row) => row['id'].toString()).toList();
+  List<String> get _activityLabels =>
+      _activities.map((row) => row['name'].toString()).toList();
+  List<String> get _operatorValues =>
+      _operators.map((row) => row['id'].toString()).toList();
+  List<String> get _operatorLabels => _operators
+      .map((row) => '${row['employee_no']} - ${row['name']}')
+      .toList();
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => ProcessxScan0Model());
+    final draft = KintaProcessDraft.instance;
+    _model.dropDownValue1 = draft.sectorId?.toString();
+    _model.dropDownValue2 = draft.activityId?.toString();
+    _model.dropDownValue3 =
+        draft.operatorIds.map((id) => id.toString()).toList();
+    _loadMasterData();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
@@ -41,6 +69,123 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
     _model.dispose();
 
     super.dispose();
+  }
+
+  Future<void> _loadMasterData() async {
+    setState(() {
+      _sectorsLoading = true;
+      _operatorsLoading = true;
+    });
+    try {
+      final results = await Future.wait([
+        KintaApiService.getList('master-data/sectors'),
+        KintaApiService.getList('master-data/users?role=operator'),
+      ]);
+      if (!mounted) return;
+      final draft = KintaProcessDraft.instance;
+      setState(() {
+        _sectors = results[0];
+        _operators = results[1];
+        final validOperatorIds = _operators
+            .map((row) => int.tryParse(row['id'].toString()))
+            .whereType<int>()
+            .toSet();
+        draft.operatorIds = draft.operatorIds.intersection(validOperatorIds);
+        draft.operatorNames = _operators
+            .where((row) => draft.operatorIds.contains(
+                int.tryParse(row['id'].toString())))
+            .map((row) => row['name'].toString())
+            .toList();
+        _model.dropDownValue3 =
+            draft.operatorIds.map((id) => id.toString()).toList();
+        _model.dropDownValueController3?.value = _model.dropDownValue3;
+
+        final savedSectorId = draft.sectorId?.toString();
+        final savedSector = _sectors
+            .where((row) => row['id'].toString() == savedSectorId)
+            .firstOrNull;
+        if (savedSector == null) {
+          draft.sectorId = null;
+          draft.sectorLabel = null;
+          draft.activityId = null;
+          draft.activityLabel = null;
+          _model.dropDownValue1 = null;
+          _model.dropDownValue2 = null;
+          _model.dropDownValueController1?.value = null;
+          _model.dropDownValueController2?.value = null;
+        } else {
+          _model.dropDownValue1 = savedSectorId;
+          _model.dropDownValueController1?.value = savedSectorId;
+          draft.sectorLabel = savedSector['name']?.toString();
+        }
+      });
+      if (draft.sectorId != null) {
+        await _loadActivities(
+          draft.sectorId!,
+          preferredActivityId: draft.activityId,
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load master data: $error')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _sectorsLoading = false;
+          _operatorsLoading = false;
+        });
+        KintaProcessDraft.instance.persistInBackground();
+      }
+    }
+  }
+
+  Future<void> _loadActivities(int sectorId,
+      {int? preferredActivityId}) async {
+    setState(() {
+      _activitiesLoading = true;
+      _activities = [];
+      if (preferredActivityId == null) {
+        _model.dropDownValue2 = null;
+        _model.dropDownValueController2?.value = null;
+        KintaProcessDraft.instance
+          ..activityId = null
+          ..activityLabel = null;
+      }
+    });
+    try {
+      final records = await KintaApiService.getList(
+        'master-data/activities?sector_id=$sectorId',
+      );
+      if (!mounted || KintaProcessDraft.instance.sectorId != sectorId) return;
+      final draft = KintaProcessDraft.instance;
+      final preferred = preferredActivityId == null
+          ? null
+          : records
+              .where((row) =>
+                  int.tryParse(row['id'].toString()) == preferredActivityId)
+              .firstOrNull;
+      setState(() {
+        _activities = records;
+        if (preferredActivityId != null) {
+          _model.dropDownValue2 =
+              preferred == null ? null : preferredActivityId.toString();
+          _model.dropDownValueController2?.value = _model.dropDownValue2;
+          draft.activityId = preferred == null ? null : preferredActivityId;
+          draft.activityLabel = preferred?['name']?.toString();
+        }
+      });
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not load activities: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _activitiesLoading = false);
+    }
   }
 
   @override
@@ -385,15 +530,14 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                 children: [
                                                     FlutterFlowDropDown<
                                                         String>(
-                                                      multiSelectController: _model
+                                                      controller: _model
                                                               .dropDownValueController1 ??=
-                                                          FormListFieldController<
-                                                              String>(null),
-                                                      options: const [
-                                                        'Option 1',
-                                                        'Option 2',
-                                                        'Option 3'
-                                                      ],
+                                                          FormFieldController<
+                                                              String>(_model.dropDownValue1),
+                                                      options: _sectorValues,
+                                                      optionLabels: _sectorLabels,
+                                                      disabled: _sectorsLoading ||
+                                                          _sectors.isEmpty,
                                                       width: double.infinity,
                                                       height: 54.0,
                                                       searchHintTextStyle:
@@ -480,7 +624,9 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                                     .bodyMedium
                                                                     .fontStyle,
                                                               ),
-                                                      hintText: 'Select Sector',
+                                                      hintText: _sectorsLoading
+                                                          ? 'Loading sectors...'
+                                                          : 'Select Sector',
                                                       searchHintText:
                                                           'Search...',
                                                       icon: Icon(
@@ -516,12 +662,32 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                       hidesUnderline: true,
                                                       isOverButton: false,
                                                       isSearchable: true,
-                                                      isMultiSelect: true,
-                                                      onMultiSelectChanged:
-                                                          (val) => safeSetState(
-                                                              () => _model
-                                                                      .dropDownValue1 =
-                                                                  val),
+                                                      isMultiSelect: false,
+                                                      onChanged: (value) {
+                                                        final sectorId =
+                                                            int.tryParse(value ?? '');
+                                                        final draft =
+                                                            KintaProcessDraft.instance;
+                                                        final sector = _sectors
+                                                            .where((row) =>
+                                                                int.tryParse(row['id'].toString()) == sectorId)
+                                                            .firstOrNull;
+                                                        safeSetState(() {
+                                                          _model.dropDownValue1 = value;
+                                                          draft.sectorId = sectorId;
+                                                          draft.sectorLabel = sector?['name']?.toString();
+                                                          _activities = [];
+                                                          _model.dropDownValue2 = null;
+                                                          _model.dropDownValueController2?.value = null;
+                                                        });
+                                                        draft
+                                                          ..activityId = null
+                                                          ..activityLabel = null;
+                                                        draft.persistInBackground();
+                                                        if (sectorId != null) {
+                                                          _loadActivities(sectorId);
+                                                        }
+                                                      },
                                                     ),
                                                 ],
                                               ),
@@ -541,15 +707,15 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                 children: [
                                                     FlutterFlowDropDown<
                                                         String>(
-                                                      multiSelectController: _model
+                                                      controller: _model
                                                               .dropDownValueController2 ??=
-                                                          FormListFieldController<
-                                                              String>(null),
-                                                      options: const [
-                                                        'Option 1',
-                                                        'Option 2',
-                                                        'Option 3'
-                                                      ],
+                                                          FormFieldController<
+                                                              String>(_model.dropDownValue2),
+                                                      options: _activityValues,
+                                                      optionLabels: _activityLabels,
+                                                      disabled: _activitiesLoading ||
+                                                          KintaProcessDraft.instance.sectorId == null ||
+                                                          _activities.isEmpty,
                                                       width: double.infinity,
                                                       height: 54.0,
                                                       searchHintTextStyle:
@@ -636,8 +802,11 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                                     .bodyMedium
                                                                     .fontStyle,
                                                               ),
-                                                      hintText:
-                                                          'Select Activities',
+                                                      hintText: _activitiesLoading
+                                                          ? 'Loading activities...'
+                                                          : (KintaProcessDraft.instance.sectorId == null
+                                                              ? 'Select a sector first'
+                                                              : 'Select Activity'),
                                                       searchHintText:
                                                           'Search...',
                                                       icon: Icon(
@@ -673,12 +842,22 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                       hidesUnderline: true,
                                                       isOverButton: false,
                                                       isSearchable: true,
-                                                      isMultiSelect: true,
-                                                      onMultiSelectChanged:
-                                                          (val) => safeSetState(
-                                                              () => _model
-                                                                      .dropDownValue2 =
-                                                                  val),
+                                                      isMultiSelect: false,
+                                                      onChanged: (value) {
+                                                        final activityId =
+                                                            int.tryParse(value ?? '');
+                                                        final activity = _activities
+                                                            .where((row) =>
+                                                                int.tryParse(row['id'].toString()) == activityId)
+                                                            .firstOrNull;
+                                                        safeSetState(() {
+                                                          _model.dropDownValue2 = value;
+                                                          KintaProcessDraft.instance
+                                                            ..activityId = activityId
+                                                            ..activityLabel = activity?['name']?.toString();
+                                                        });
+                                                        KintaProcessDraft.instance.persistInBackground();
+                                                      },
                                                     ),
                                                 ],
                                               ),
@@ -731,12 +910,11 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                       multiSelectController: _model
                                                               .dropDownValueController3 ??=
                                                           FormListFieldController<
-                                                              String>(null),
-                                                      options: const [
-                                                        'Option 1',
-                                                        'Option 2',
-                                                        'Option 3'
-                                                      ],
+                                                              String>(_model.dropDownValue3),
+                                                      options: _operatorValues,
+                                                      optionLabels: _operatorLabels,
+                                                      disabled: _operatorsLoading ||
+                                                          _operators.isEmpty,
                                                       width: double.infinity,
                                                       height: 54.0,
                                                       searchHintTextStyle:
@@ -823,8 +1001,9 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                                     .bodyMedium
                                                                     .fontStyle,
                                                               ),
-                                                      hintText:
-                                                          'Select Operators',
+                                                      hintText: _operatorsLoading
+                                                          ? 'Loading operators...'
+                                                          : 'Select Operators',
                                                       searchHintText:
                                                           'Search...',
                                                       icon: Icon(
@@ -861,11 +1040,23 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                       isOverButton: false,
                                                       isSearchable: true,
                                                       isMultiSelect: true,
-                                                      onMultiSelectChanged:
-                                                          (val) => safeSetState(
-                                                              () => _model
-                                                                      .dropDownValue3 =
-                                                                  val),
+                                                      onMultiSelectChanged: (values) {
+                                                        final selected = values ?? <String>[];
+                                                        final ids = selected
+                                                            .map((value) => int.tryParse(value))
+                                                            .whereType<int>()
+                                                            .toSet();
+                                                        final draft = KintaProcessDraft.instance;
+                                                        safeSetState(() {
+                                                          _model.dropDownValue3 = selected;
+                                                          draft.operatorIds = ids;
+                                                          draft.operatorNames = _operators
+                                                              .where((row) => ids.contains(int.tryParse(row['id'].toString())))
+                                                              .map((row) => row['name'].toString())
+                                                              .toList();
+                                                        });
+                                                        draft.persistInBackground();
+                                                      },
                                                     ),
                                                 ],
                                               ),
@@ -910,8 +1101,18 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                                         .max,
                                                                 children: [
                                                                   FFButtonWidget(
-                                                                    onPressed:
-                                                                        () async {
+                                                                    onPressed: () {
+                                                                      final draft =
+                                                                          KintaProcessDraft.instance;
+                                                                      if (draft.sectorId == null ||
+                                                                          draft.activityId == null) {
+                                                                        ScaffoldMessenger.of(context).showSnackBar(
+                                                                          const SnackBar(
+                                                                            content: Text('Select a sector and activity to proceed.'),
+                                                                          ),
+                                                                        );
+                                                                        return;
+                                                                      }
                                                                       context.pushNamed(
                                                                           ProcessxScan1Widget
                                                                               .routeName);
@@ -989,9 +1190,7 @@ class _ProcessxScan0WidgetState extends State<ProcessxScan0Widget> {
                                                                   FFButtonWidget(
                                                                     onPressed:
                                                                         () async {
-                                                                      context.pushNamed(
-                                                                          ScanSalesOrderWidget
-                                                                              .routeName);
+                                                                      context.pop();
                                                                     },
                                                                     text:
                                                                         'Cancel',

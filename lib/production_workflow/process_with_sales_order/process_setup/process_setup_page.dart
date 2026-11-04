@@ -293,7 +293,8 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      DateFormat('d MMMM yyyy').format(DateTime.now()),
+                                      DateFormat('d MMMM yyyy')
+                                          .format(DateTime.now()),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -313,7 +314,9 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                           ),
                                     ),
                                     Text(
-                                      DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
+                                      DateFormat('hh:mm a')
+                                          .format(DateTime.now())
+                                          .toLowerCase(),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -510,6 +513,12 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                                                               .bodyMedium
                                                                               .fontStyle,
                                                                         ),
+                                                                  ),
+                                                                  Text(
+                                                                    'Batch quantity: ${KintaProcessDraft.instance.batchQty ?? 'Not provided'}',
+                                                                    style: FlutterFlowTheme.of(
+                                                                            context)
+                                                                        .bodyMedium,
                                                                   ),
                                                                 ],
                                                               ),

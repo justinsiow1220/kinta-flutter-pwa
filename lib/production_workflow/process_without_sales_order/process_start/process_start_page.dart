@@ -43,8 +43,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
     )..addListener(() => safeSetState(() {}));
 
     _model.textController ??= TextEditingController(
-        text:
-            'Description description description  description description description description description ');
+        text: KintaProcessDraft.instance.activityDescription ?? '');
     _model.textFieldFocusNode ??= FocusNode();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
@@ -536,7 +535,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                     ),
                                                                                     alignment: const AlignmentDirectional(0.0, 0.0),
                                                                                     child: Text(
-                                                                                      'Activity 8',
+                                                                                      KintaProcessDraft.instance.activityLabel ?? 'Activity',
                                                                                       style: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                             font: GoogleFonts.manrope(
                                                                                               fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -618,16 +617,20 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                     child: TextFormField(
                                                                                       controller: _model.textController,
                                                                                       focusNode: _model.textFieldFocusNode,
-                                                                                      onChanged: (_) => EasyDebounce.debounce(
-                                                                                        '_model.textController',
-                                                                                        const Duration(milliseconds: 2000),
-                                                                                        () => safeSetState(() {}),
-                                                                                      ),
+                                                                                      onChanged: (value) {
+                                                                                        KintaProcessDraft.instance.activityDescription = value;
+                                                                                        EasyDebounce.debounce(
+                                                                                          '_model.textController',
+                                                                                          const Duration(milliseconds: 2000),
+                                                                                          () => safeSetState(() {}),
+                                                                                        );
+                                                                                      },
                                                                                       autofocus: false,
                                                                                       enabled: true,
                                                                                       obscureText: false,
                                                                                       decoration: InputDecoration(
                                                                                         isDense: true,
+                                                                                        hintText: 'Enter activity description',
                                                                                         labelStyle: FlutterFlowTheme.of(context).labelMedium.override(
                                                                                               font: GoogleFonts.inter(
                                                                                                 fontWeight: FlutterFlowTheme.of(context).labelMedium.fontWeight,
@@ -737,37 +740,16 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                                                   children: [
                                                                                     FFButtonWidget(
-                                                                                      onPressed: () async {
-                                                                                        await showModalBottomSheet(
-                                                                                          isScrollControlled: true,
-                                                                                          backgroundColor: FlutterFlowTheme.of(context).info,
-                                                                                          enableDrag: false,
-                                                                                          useSafeArea: true,
-                                                                                          context: context,
-                                                                                          builder: (context) {
-                                                                                            return GestureDetector(
-                                                                                              onTap: () {
-                                                                                                FocusScope.of(context).unfocus();
-                                                                                                FocusManager.instance.primaryFocus?.unfocus();
-                                                                                              },
-                                                                                              child: Padding(
-                                                                                                padding: MediaQuery.viewInsetsOf(context),
-                                                                                                child: SizedBox(
-                                                                                                  height: 200.0,
-                                                                                                  child: const ProcessStarted1Widget(),
-                                                                                                ),
-                                                                                              ),
-                                                                                            );
-                                                                                          },
-                                                                                        ).then((value) => safeSetState(() {}));
+                                                                                      onPressed: () {
+                                                                                        context.pop();
                                                                                       },
-                                                                                      text: 'Process Start',
+                                                                                      text: 'Cancel',
                                                                                       options: FFButtonOptions(
                                                                                         width: MediaQuery.sizeOf(context).width * 0.5,
                                                                                         height: 52.0,
                                                                                         padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
                                                                                         iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                                                                        color: FlutterFlowTheme.of(context).success,
+                                                                                        color: FlutterFlowTheme.of(context).error,
                                                                                         textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                               font: GoogleFonts.manrope(
                                                                                                 fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,
@@ -798,16 +780,25 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                                                   children: [
                                                                                     FFButtonWidget(
-                                                                                      onPressed: () {
-                                                                                        print('Button pressed ...');
+                                                                                      onPressed: () async {
+                                                                                        final continueToProcess = await showDialog<bool>(
+                                                                                          context: context,
+                                                                                          builder: (_) => const Dialog(
+                                                                                            child: ProcessStarted1Widget(),
+                                                                                          ),
+                                                                                        );
+                                                                                        if (continueToProcess == true && mounted) {
+                                                                                          KintaProcessDraft.instance.activityDescription = _model.textController?.text.trim();
+                                                                                          context.pushNamed('ProcessxScan2');
+                                                                                        }
                                                                                       },
-                                                                                      text: 'Cancel',
+                                                                                      text: 'Process Start',
                                                                                       options: FFButtonOptions(
                                                                                         width: MediaQuery.sizeOf(context).width * 0.5,
                                                                                         height: 52.0,
                                                                                         padding: const EdgeInsetsDirectional.fromSTEB(5.0, 0.0, 5.0, 0.0),
                                                                                         iconPadding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 0.0),
-                                                                                        color: FlutterFlowTheme.of(context).error,
+                                                                                        color: FlutterFlowTheme.of(context).success,
                                                                                         textStyle: FlutterFlowTheme.of(context).titleSmall.override(
                                                                                               font: GoogleFonts.manrope(
                                                                                                 fontWeight: FlutterFlowTheme.of(context).titleSmall.fontWeight,

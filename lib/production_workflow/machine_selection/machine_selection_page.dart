@@ -6,7 +6,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
-import 'dart:ui';
 import '/index.dart';
 import '/kinta_api_service.dart';
 import '/kinta_process_draft.dart';
@@ -15,9 +14,8 @@ import '/offline/kinta_local_repository.dart';
 import '/offline/kinta_sync_service.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
+//import 'package:provider/provider.dart';
 import 'machine_selection_model.dart';
 export 'machine_selection_model.dart';
 
@@ -133,7 +131,9 @@ class _HomeWidgetState extends State<HomeWidget> {
                       : report.synced == 0
                           ? 'No pending processes to sync.'
                           : '${report.synced} process(es) synced successfully.';
-      if (!silent) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      if (!silent)
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,17 +152,55 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
     await _refreshPendingSyncCount();
   }
+
   Future<void> _prepareOfflineData() async {
     try {
       await KintaAuthService.retryOfflinePreload();
       if (!mounted) return;
       setState(() {});
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Offline data is ready on this device.')));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Offline data is ready on this device.')));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Offline setup failed: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Offline setup failed: $error')));
     }
   }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out?'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await KintaAuthService.logout();
+    if (mounted) context.goNamed(LoginWidget.routeName);
+  }
+
+  void _continueToWorkflow(String routeName) {
+    if (KintaProcessDraft.instance.machineId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a machine to proceed.')),
+      );
+      return;
+    }
+    context.pushNamed(routeName);
+  }
+
   Future<void> _loadMachines() async {
     setState(() {
       _machinesLoading = true;
@@ -241,20 +279,25 @@ class _HomeWidgetState extends State<HomeWidget> {
                 ),
           ),
           actions: [
-            IconButton(tooltip: KintaAuthService.offlineReady ? 'Offline access ready' : 'Retry offline data preload', onPressed: KintaAuthService.offlineReady ? _showOfflineRecords : _prepareOfflineData, icon: Icon(KintaAuthService.offlineReady ? Icons.offline_pin : Icons.cloud_download, color: Colors.white)),
-            IconButton(tooltip: 'View process records', onPressed: _showOfflineRecords, icon: const Icon(Icons.inventory_2_outlined, color: Colors.white)),
+            if (!KintaAuthService.offlineReady)
+              IconButton(
+                tooltip: 'Retry offline data preload',
+                onPressed: _prepareOfflineData,
+                icon: const Icon(Icons.cloud_download, color: Colors.white),
+              ),
+            IconButton(
+                tooltip: 'View process records',
+                onPressed: _showOfflineRecords,
+                icon: const Icon(Icons.inventory_2_outlined,
+                    color: Colors.white)),
             IconButton(
               tooltip: 'Sign out',
-              onPressed: () async {
-                await KintaAuthService.logout();
-                if (mounted) context.goNamed(LoginWidget.routeName);
-              },
+              onPressed: _confirmSignOut,
               icon: const Icon(Icons.logout, color: Colors.white),
             ),
             Tooltip(
               message: _pendingSyncCount == 0 &&
-                      (_needsReviewCount > 0 ||
-                          _waitingForMasterDataCount > 0)
+                      (_needsReviewCount > 0 || _waitingForMasterDataCount > 0)
                   ? 'Open local process records needing attention'
                   : 'Synchronize pending processes',
               child: TextButton.icon(
@@ -284,8 +327,8 @@ class _HomeWidgetState extends State<HomeWidget> {
                       : _waitingForMasterDataCount > 0
                           ? 'Waiting ($_waitingForMasterDataCount)'
                           : _needsReviewCount > 0
-                          ? 'Review ($_needsReviewCount)'
-                          : 'Sync',
+                              ? 'Review ($_needsReviewCount)'
+                              : 'Sync',
                 ),
                 style: TextButton.styleFrom(foregroundColor: Colors.white),
               ),
@@ -318,7 +361,8 @@ class _HomeWidgetState extends State<HomeWidget> {
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      DateFormat('d MMMM yyyy').format(DateTime.now()),
+                                      DateFormat('d MMMM yyyy')
+                                          .format(DateTime.now()),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -338,7 +382,9 @@ class _HomeWidgetState extends State<HomeWidget> {
                                           ),
                                     ),
                                     Text(
-                                      DateFormat('hh:mm a').format(DateTime.now()).toLowerCase(),
+                                      DateFormat('hh:mm a')
+                                          .format(DateTime.now())
+                                          .toLowerCase(),
                                       style: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .override(
@@ -654,11 +700,11 @@ class _HomeWidgetState extends State<HomeWidget> {
                                                             MainAxisSize.max,
                                                         children: [
                                                           FFButtonWidget(
-                                                            onPressed:
-                                                                () async {
-                                                              context.pushNamed(
-                                                                  ScanSalesOrderWidget
-                                                                      .routeName);
+                                                            onPressed: () {
+                                                              _continueToWorkflow(
+                                                                ScanSalesOrderWidget
+                                                                    .routeName,
+                                                              );
                                                             },
                                                             text: 'Yes',
                                                             options:
@@ -737,11 +783,11 @@ class _HomeWidgetState extends State<HomeWidget> {
                                                             MainAxisSize.max,
                                                         children: [
                                                           FFButtonWidget(
-                                                            onPressed:
-                                                                () async {
-                                                              context.pushNamed(
-                                                                  ProcessxScan0Widget
-                                                                      .routeName);
+                                                            onPressed: () {
+                                                              _continueToWorkflow(
+                                                                ManualSalesOrderWidget
+                                                                    .routeName,
+                                                              );
                                                             },
                                                             text: 'No',
                                                             options:
@@ -834,7 +880,3 @@ class _HomeWidgetState extends State<HomeWidget> {
     );
   }
 }
-
-
-
-

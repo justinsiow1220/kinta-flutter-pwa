@@ -43,6 +43,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Kinta uses the camera to scan sales order QR codes.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Kinta uses selected images to scan sales order QR codes.</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 
