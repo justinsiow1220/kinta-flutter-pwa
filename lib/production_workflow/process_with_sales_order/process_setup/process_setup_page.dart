@@ -8,6 +8,7 @@ import 'dart:ui';
 import '/index.dart';
 import '/kinta_api_service.dart';
 import '/kinta_process_draft.dart';
+import '/auth/kinta_auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -33,11 +34,9 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
   List<Map<String, dynamic>> _sectors = [];
   List<Map<String, dynamic>> _activities = [];
   List<Map<String, dynamic>> _operators = [];
-  List<Map<String, dynamic>> _supervisors = [];
   bool _sectorsLoading = true;
   bool _activitiesLoading = false;
   bool _operatorsLoading = true;
-  bool _supervisorsLoading = true;
   String? _masterDataError;
   String? _activityLoadError;
 
@@ -97,20 +96,17 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
     setState(() {
       _sectorsLoading = true;
       _operatorsLoading = true;
-      _supervisorsLoading = true;
       _masterDataError = null;
     });
     try {
       final results = await Future.wait([
         KintaApiService.getList('master-data/sectors'),
         KintaApiService.getList('master-data/users?role=operator'),
-        KintaApiService.getList('master-data/users?role=supervisor'),
       ]);
       if (!mounted) return;
       setState(() {
         _sectors = results[0];
         _operators = results[1];
-        _supervisors = results[2];
         final draft = KintaProcessDraft.instance;
         final activeOperatorIds = _operators
             .map((row) => int.tryParse(row['id'].toString()))
@@ -125,12 +121,14 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
         _model.dropDownValue3 =
             draft.operatorIds.map((id) => id.toString()).toList();
         _model.dropDownValueController3?.value = _model.dropDownValue3;
-        final supervisor = _supervisors
-            .where((row) =>
-                int.tryParse(row['id'].toString()) == draft.supervisorId)
-            .firstOrNull;
-        draft.supervisorId = supervisor == null ? null : draft.supervisorId;
-        draft.supervisorName = supervisor?['name']?.toString();
+        final currentUser = KintaAuthService.currentUser;
+        final currentSupervisorId =
+            int.tryParse(currentUser?['id']?.toString() ?? '');
+        if (currentSupervisorId != null) {
+          draft.supervisorId = currentSupervisorId;
+          draft.supervisorName = currentUser?['name']?.toString() ??
+              currentUser?['email']?.toString();
+        }
         final sectorValue = draft.sectorId?.toString();
         if (_sectors.any((row) => row['id'].toString() == sectorValue)) {
           _model.dropDownValue1 = sectorValue;
@@ -169,7 +167,6 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
         setState(() {
           _sectorsLoading = false;
           _operatorsLoading = false;
-          _supervisorsLoading = false;
         });
         KintaProcessDraft.instance.persistInBackground();
       }
@@ -189,9 +186,7 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
       }
     });
     try {
-      final records = await KintaApiService.getList(
-        'master-data/activities?sector_id=$sectorId',
-      );
+      final records = await KintaApiService.getActivitiesForSector(sectorId);
       if (!mounted || KintaProcessDraft.instance.sectorId != sectorId) return;
       final draft = KintaProcessDraft.instance;
       final preferred = preferredActivityId == null
@@ -865,10 +860,12 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                                         ),
                                                 hintText: _activitiesLoading
                                                     ? 'Loading activities...'
-                                                    : (_activityLoadError ==
+                                                    : (_activityLoadError !=
                                                             null
-                                                        ? 'Select Activities'
-                                                        : 'Could not load activities'),
+                                                        ? 'Could not load activities'
+                                                        : (_activities.isEmpty
+                                                            ? 'No activities for this sector'
+                                                            : 'Select Activity')),
                                                 searchHintText: 'Search...',
                                                 icon: Icon(
                                                   Icons
@@ -919,61 +916,30 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                                       .persistInBackground();
                                                 },
                                               ),
+                                              if (!_activitiesLoading &&
+                                                  KintaProcessDraft
+                                                          .instance.sectorId !=
+                                                      null &&
+                                                  (_activityLoadError != null ||
+                                                      _activities.isEmpty))
+                                                TextButton.icon(
+                                                  onPressed: () =>
+                                                      _loadActivities(
+                                                    KintaProcessDraft
+                                                        .instance.sectorId!,
+                                                  ),
+                                                  icon: const Icon(
+                                                      Icons.refresh,
+                                                      size: 16),
+                                                  label: Text(_activityLoadError !=
+                                                          null
+                                                      ? 'Retry loading activities'
+                                                      : 'Reload activities'),
+                                                ),
                                             ],
                                           ),
                                         ),
                                       ],
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding:
-                                        const EdgeInsetsDirectional.fromSTEB(
-                                            0, 8, 0, 12),
-                                    child: DropdownButtonFormField<int>(
-                                      value: _supervisors.any((row) =>
-                                              int.tryParse(
-                                                  row['id'].toString()) ==
-                                              KintaProcessDraft
-                                                  .instance.supervisorId)
-                                          ? KintaProcessDraft
-                                              .instance.supervisorId
-                                          : null,
-                                      decoration: const InputDecoration(
-                                          labelText: 'Current Supervisor',
-                                          border: OutlineInputBorder()),
-                                      hint: Text(_supervisorsLoading
-                                          ? 'Loading supervisors...'
-                                          : 'Select supervisor'),
-                                      items: _supervisors
-                                          .map((row) {
-                                            final id = int.tryParse(
-                                                row['id'].toString());
-                                            return DropdownMenuItem<int>(
-                                                value: id,
-                                                child: Text(
-                                                    '${row['employee_no']} - ${row['name']}'));
-                                          })
-                                          .where((item) => item.value != null)
-                                          .toList(),
-                                      onChanged: _supervisorsLoading ||
-                                              _supervisors.isEmpty
-                                          ? null
-                                          : (id) => setState(() {
-                                                final supervisor = _supervisors
-                                                    .where((row) =>
-                                                        int.tryParse(row['id']
-                                                            .toString()) ==
-                                                        id)
-                                                    .firstOrNull;
-                                                KintaProcessDraft
-                                                    .instance.supervisorId = id;
-                                                KintaProcessDraft.instance
-                                                        .supervisorName =
-                                                    supervisor?['name']
-                                                        ?.toString();
-                                                KintaProcessDraft.instance
-                                                    .persistInBackground();
-                                              }),
                                     ),
                                   ),
                                   Padding(
@@ -1231,7 +1197,7 @@ class _ProcesswScan0WidgetState extends State<ProcesswScan0Widget> {
                                                                       .showSnackBar(
                                                                     const SnackBar(
                                                                       content: Text(
-                                                                          'Select a machine, sector, activity, and supervisor before continuing.'),
+                                                                          'Your supervisor session or process selections are missing. Please sign in again and complete the setup.'),
                                                                     ),
                                                                   );
                                                                   return;

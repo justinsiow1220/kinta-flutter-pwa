@@ -10,7 +10,8 @@ export '/account/password_reset_complete/password_reset_complete_widget.dart'
     show PasswordResetCompleteWidget;
 export '/account/change_password/change_password_widget.dart'
     show ChangePasswordWidget;
-export '/production_workflow/machine_selection/machine_selection_page.dart' show HomeWidget;
+export '/production_workflow/machine_selection/machine_selection_page.dart'
+    show HomeWidget;
 export '/production_workflow/sales_order_scan/sales_order_scan_page.dart'
     show ScanSalesOrderWidget;
 export '/production_workflow/sales_order_scan/manual_sales_order_page.dart'
@@ -21,8 +22,6 @@ export '/production_workflow/process_with_sales_order/process_start/process_star
     show ProcesswScan1Widget;
 export '/production_workflow/process_with_sales_order/process_activity/process_activity_page.dart'
     show ProcesswScan2Widget;
-export '/production_workflow/process_with_sales_order/alternate_process_activity/alternate_process_activity_page.dart'
-    show ProcesswScan3Widget;
 export '/production_workflow/process_with_sales_order/process_result_entry/process_result_entry_page.dart'
     show ProcesswScan4Widget;
 export '/production_workflow/process_with_sales_order/process_result_summary/process_result_summary_page.dart'

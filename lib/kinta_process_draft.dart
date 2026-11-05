@@ -16,6 +16,8 @@ class KintaProcessDraft {
   int? batchQty;
   int? qtyPassed;
   int? qtyRejected;
+  DateTime? startedAt;
+  DateTime? endedAt;
   String? machineLabel;
   String? sectorLabel;
   String? activityLabel;
@@ -38,6 +40,8 @@ class KintaProcessDraft {
     localProcessId = null;
     qtyPassed = null;
     qtyRejected = null;
+    startedAt = null;
+    endedAt = null;
     activityDescription = null;
     // Draft selections are intentionally session-only and are not restored.
   }

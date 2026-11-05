@@ -1,17 +1,20 @@
 import '/components/process_started_without_sales_order_dialog.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
+import '/kinta_api_service.dart';
+import '/auth/kinta_auth_service.dart';
 import '/kinta_process_draft.dart';
+import '/offline/kinta_local_repository.dart';
+import '/utils/kinta_time.dart';
 import '/flutter_flow/flutter_flow_button_tabbar.dart';
 import '/flutter_flow/flutter_flow_icon_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import 'process_start_model.dart';
 export 'process_start_model.dart';
 
@@ -30,6 +33,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
   late ProcessxScan1Model _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isStartingProcess = false;
 
   @override
   void initState() {
@@ -54,6 +58,172 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
     _model.dispose();
 
     super.dispose();
+  }
+
+  Map<String, Object?> _localProcessRecord(
+    KintaProcessDraft draft, {
+    required int? serverProcessId,
+    required String startedAt,
+  }) => {
+        'server_process_id': serverProcessId,
+        'actor_user_id': KintaAuthService.currentUser?['id'],
+        'sync_status': serverProcessId == null ? 'pending' : 'synced',
+        'sync_pending': serverProcessId == null,
+        'machine_id': draft.machineId,
+        'machine_name': draft.machineLabel,
+        'sector_id': draft.sectorId,
+        'sector_name': draft.sectorLabel,
+        'activity_id': draft.activityId,
+        'activity_name': draft.activityLabel,
+        'description': draft.activityDescription,
+        'sales_order_id': null,
+        'so_number': null,
+        'customer_name': null,
+        'batch_qty': null,
+        'current_supervisor_id': draft.supervisorId,
+        'current_supervisor_name': draft.supervisorName,
+        'operator_ids': draft.operatorIds.toList(),
+        'operator_names': draft.operatorNames,
+        'status': 'active',
+        'started_at': startedAt,
+        'ended_at': null,
+        'qty_passed': null,
+        'qty_rejected': null,
+        'remarks': null,
+        'qc_inspections': <Map<String, Object?>>[],
+        'problems': <Map<String, Object?>>[],
+        'pic_history': <Map<String, Object?>>[
+          {
+            'supervisor_id': draft.supervisorId,
+            'supervisor_name': draft.supervisorName,
+            'started_at': startedAt,
+            'ended_at': null,
+            '_sync_status': 'synced',
+          },
+        ],
+      };
+
+  Future<void> _startProcess() async {
+    if (_isStartingProcess) return;
+    final draft = KintaProcessDraft.instance;
+    final currentUser = KintaAuthService.currentUser;
+    draft
+      ..supervisorId ??= int.tryParse(currentUser?['id']?.toString() ?? '')
+      ..supervisorName ??= currentUser?['name']?.toString() ??
+          currentUser?['email']?.toString();
+    if (draft.machineId == null ||
+        draft.sectorId == null ||
+        draft.activityId == null ||
+        draft.supervisorId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Return to setup and select machine, sector, and activity. Ensure you are signed in as a supervisor.'),
+      ));
+      return;
+    }
+    if (!KintaAuthService.hasPermission('process.write')) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Your account does not have permission to start a process.'),
+      ));
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => const Dialog(
+        child: ProcessStarted1Widget(),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isStartingProcess = true);
+    final description = _model.textController?.text.trim();
+    final startedAt = DateTime.now();
+    draft
+      ..activityDescription = description == null || description.isEmpty
+          ? null
+          : description
+      ..startedAt = startedAt
+      ..endedAt = null
+      ..processId = null
+      ..localProcessId = null
+      ..qtyPassed = null
+      ..qtyRejected = null;
+
+    var offlineMessage = false;
+    try {
+      try {
+        if (draft.salesOrderId == null &&
+            draft.soNumber != null &&
+            draft.customerName != null &&
+            draft.batchQty != null) {
+          final order = await KintaApiService.postJson(
+            'master-data/sales-orders',
+            {
+              'so_number': draft.soNumber,
+              'customer_name': draft.customerName,
+              'batch_qty': draft.batchQty,
+            },
+          );
+          draft.salesOrderId = int.tryParse(order['id']?.toString() ?? '');
+          try {
+            await KintaLocalRepository.removePendingSalesOrder(draft.soNumber!);
+          } catch (_) {}
+        }
+        final data = await KintaApiService.postJson('processes', {
+          'machine_id': draft.machineId,
+          'sector_id': draft.sectorId,
+          'activity_id': draft.activityId,
+          'current_supervisor_id': draft.supervisorId,
+          'sales_order_id': draft.salesOrderId,
+          'operator_ids': draft.operatorIds.toList(),
+          'description': draft.activityDescription,
+        });
+        draft.processId = int.tryParse(data['id'].toString());
+        if (draft.processId == null) {
+          throw const FormatException('CI4 did not return the new process ID.');
+        }
+        final serverStartedAt = KintaTime.toUtcIso(data['started_at']) ??
+            startedAt.toUtc().toIso8601String();
+        draft.startedAt = KintaTime.parseUtc(serverStartedAt);
+        try {
+          draft.localProcessId = await KintaLocalRepository.createLocalProcess(
+            _localProcessRecord(
+              draft,
+              serverProcessId: draft.processId,
+              startedAt: serverStartedAt,
+            ),
+          );
+        } catch (error) {
+          debugPrint('Could not cache the started process locally: $error');
+        }
+      } on http.ClientException {
+        draft.processId = null;
+        draft.localProcessId = await KintaLocalRepository.createLocalProcess(
+          _localProcessRecord(
+            draft,
+            serverProcessId: null,
+            startedAt: startedAt.toUtc().toIso8601String(),
+          ),
+        );
+        offlineMessage = true;
+      }
+
+      if (!mounted) return;
+      if (offlineMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('CI4 is unavailable. The process is saved on this device and will sync when online.'),
+        ));
+      }
+      await context.pushNamed('ProcessxScan2');
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start process: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isStartingProcess = false);
+    }
   }
 
   @override
@@ -319,9 +489,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
-                                                              const ProcessRecordsDialog(
-                                                                embedded: true,
-                                                              ),
+                                                              const ProcessRecordsPreviousTab(),
                                                               Padding(
                                                                 padding:
                                                                     const EdgeInsets
@@ -431,7 +599,7 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
                                                                                                         Text(
-                                                                                                          'Supervisor 1',
+                                                                                                          KintaProcessDraft.instance.supervisorName ?? 'Supervisor not set',
                                                                                                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                                                 font: GoogleFonts.inter(
                                                                                                                   fontWeight: FontWeight.w600,
@@ -780,19 +948,8 @@ class _ProcessxScan1WidgetState extends State<ProcessxScan1Widget>
                                                                                   crossAxisAlignment: CrossAxisAlignment.start,
                                                                                   children: [
                                                                                     FFButtonWidget(
-                                                                                      onPressed: () async {
-                                                                                        final continueToProcess = await showDialog<bool>(
-                                                                                          context: context,
-                                                                                          builder: (_) => const Dialog(
-                                                                                            child: ProcessStarted1Widget(),
-                                                                                          ),
-                                                                                        );
-                                                                                        if (continueToProcess == true && mounted) {
-                                                                                          KintaProcessDraft.instance.activityDescription = _model.textController?.text.trim();
-                                                                                          context.pushNamed('ProcessxScan2');
-                                                                                        }
-                                                                                      },
-                                                                                      text: 'Process Start',
+                                                                                      onPressed: _isStartingProcess ? null : _startProcess,
+                                                                                      text: _isStartingProcess ? 'Starting...' : 'Process Start',
                                                                                       options: FFButtonOptions(
                                                                                         width: MediaQuery.sizeOf(context).width * 0.5,
                                                                                         height: 52.0,

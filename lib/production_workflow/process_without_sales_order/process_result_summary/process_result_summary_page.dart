@@ -4,6 +4,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/kinta_process_draft.dart';
+import '/auth/kinta_auth_service.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
 import 'dart:ui';
 import '/index.dart';
@@ -38,7 +39,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
     _model.tabBarController = TabController(
       vsync: this,
       length: 2,
-      initialIndex: 0,
+      initialIndex: 1,
     )..addListener(() => safeSetState(() {}));
 
     _model.textController ??= TextEditingController(
@@ -54,6 +55,10 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
 
     super.dispose();
   }
+
+  String _draftTimestamp(DateTime? value) => value == null
+      ? '-'
+      : DateFormat('yyyy-MM-dd | hh:mma').format(value).toLowerCase();
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +125,17 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           children: [
+                            Padding(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
+                                  0.0, 0.0, 0.0, 6.0),
+                              child: Text(
+                                KintaProcessDraft.instance.sectorLabel ??
+                                    'Sector not selected',
+                                style: FlutterFlowTheme.of(context)
+                                    .titleSmall
+                                    .copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ),
                             Row(
                               mainAxisSize: MainAxisSize.max,
                               children: [
@@ -324,9 +340,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
-                                                              const ProcessRecordsDialog(
-                                                                  embedded:
-                                                                      true),
+                                                              const ProcessRecordsPreviousTab(),
                                                               Padding(
                                                                 padding:
                                                                     const EdgeInsets
@@ -437,7 +451,10 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                                       crossAxisAlignment: CrossAxisAlignment.start,
                                                                                                       children: [
                                                                                                         Text(
-                                                                                                          'Supervisor 1',
+                                                                                                          KintaProcessDraft.instance.supervisorName ??
+                                                                                                              KintaAuthService.currentUser?['name']?.toString() ??
+                                                                                                              KintaAuthService.currentUser?['email']?.toString() ??
+                                                                                                              '-',
                                                                                                           style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                                                 font: GoogleFonts.inter(
                                                                                                                   fontWeight: FontWeight.w600,
@@ -780,7 +797,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                                                 children: [
                                                                                   Text(
-                                                                                    '2024-03-26 | 08:39am',
+                                                                                    _draftTimestamp(KintaProcessDraft.instance.startedAt),
                                                                                     style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                           font: GoogleFonts.inter(
                                                                                             fontWeight: FontWeight.w600,
@@ -841,7 +858,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                                                 children: [
                                                                                   Text(
-                                                                                    '2024-03-26 | 11:15am',
+                                                                                    _draftTimestamp(KintaProcessDraft.instance.endedAt),
                                                                                     style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                           font: GoogleFonts.inter(
                                                                                             fontWeight: FontWeight.w600,
@@ -885,6 +902,7 @@ class _ProcessxScan3WidgetState extends State<ProcessxScan3Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
+                                                                                        KintaProcessDraft.instance.prepareForNewProcess();
                                                                                         context.pushNamed(HomeWidget.routeName);
                                                                                       },
                                                                                       text: 'Start New',

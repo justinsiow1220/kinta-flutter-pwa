@@ -1,3 +1,4 @@
+import '/index.dart' show ScanSalesOrderWidget;
 import '/components/process_started_with_sales_order_dialog.dart';
 import '/production_workflow/process_records/process_records_dialog.dart';
 import '/kinta_api_service.dart';
@@ -34,7 +35,6 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
   late ProcesswScan1Model _model;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
-  final _activityDescriptionController = TextEditingController();
   bool _isStartingProcess = false;
 
   @override
@@ -48,15 +48,14 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
       initialIndex: 1,
     )..addListener(() => safeSetState(() {}));
 
-    _activityDescriptionController.text =
-        KintaProcessDraft.instance.activityDescription ?? '';
+    // Descriptions are entered in the non-scan workflow only.
+    KintaProcessDraft.instance.activityDescription = null;
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
   @override
   void dispose() {
-    _activityDescriptionController.dispose();
     _model.dispose();
 
     super.dispose();
@@ -378,9 +377,7 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
-                                                              const ProcessRecordsDialog(
-                                                                embedded: true,
-                                                              ),
+                                                              const ProcessRecordsPreviousTab(),
                                                               Padding(
                                                                 padding:
                                                                     const EdgeInsets
@@ -793,32 +790,51 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                         ),
                                                                       ),
                                                                       Padding(
-                                                                        padding: const EdgeInsetsDirectional
-                                                                            .fromSTEB(
+                                                                        padding: const EdgeInsetsDirectional.fromSTEB(
                                                                             0.0,
                                                                             8.0,
                                                                             0.0,
                                                                             10.0),
-                                                                        child:
-                                                                            Column(
-                                                                          crossAxisAlignment:
-                                                                              CrossAxisAlignment.start,
+                                                                        child: Column(
+                                                                          crossAxisAlignment: CrossAxisAlignment.start,
                                                                           children: [
-                                                                            Text(
-                                                                              'Description',
-                                                                              style: FlutterFlowTheme.of(context).bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                                                                            ),
-                                                                            const SizedBox(height: 6.0),
-                                                                            TextFormField(
-                                                                              controller: _activityDescriptionController,
-                                                                              minLines: 2,
-                                                                              maxLines: 4,
-                                                                              decoration: const InputDecoration(
-                                                                                hintText: 'Enter a description for this activity',
-                                                                                border: OutlineInputBorder(),
-                                                                                isDense: true,
-                                                                              ),
-                                                                              onChanged: (value) => KintaProcessDraft.instance.activityDescription = value,
+                                                                            Builder(
+                                                                              builder: (context) {
+                                                                                final draft = KintaProcessDraft.instance;
+                                                                                final hasQuantities = draft.qtyPassed != null || draft.qtyRejected != null;
+                                                                                final totalProcessed = hasQuantities
+                                                                                    ? NumberFormat('#,##0').format(draft.totalProcessed)
+                                                                                    : '-';
+                                                                                final batchQuantity = draft.batchQty == null
+                                                                                    ? '-'
+                                                                                    : NumberFormat('#,##0').format(draft.batchQty!);
+                                                                                final qtyPassed = draft.qtyPassed == null
+                                                                                    ? '-'
+                                                                                    : NumberFormat('#,##0').format(draft.qtyPassed!);
+                                                                                final qtyRejected = draft.qtyRejected == null
+                                                                                    ? '-'
+                                                                                    : NumberFormat('#,##0').format(draft.qtyRejected!);
+                                                                                final detailsStyle = FlutterFlowTheme.of(context).bodyMedium;
+                                                                                Widget detailLine(String text) => Padding(
+                                                                                  padding: const EdgeInsets.symmetric(vertical: 5.0),
+                                                                                  child: Text(text, style: detailsStyle),
+                                                                                );
+                                                                                return Column(
+                                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                                  children: [
+                                                                                    detailLine('Total Processed: $totalProcessed'),
+                                                                                    const Divider(height: 16.0),
+                                                                                    detailLine('Batch Qty: $batchQuantity unit'),
+                                                                                    detailLine('Process Started: -'),
+                                                                                    detailLine('Process Ended: -'),
+                                                                                    const Divider(height: 16.0),
+                                                                                    detailLine('Qty Passed: $qtyPassed'),
+                                                                                    detailLine('Qty Rejected: $qtyRejected'),
+                                                                                    detailLine('Problem: -'),
+                                                                                    detailLine('Remarks: -'),
+                                                                                  ],
+                                                                                );
+                                                                              },
                                                                             ),
                                                                           ],
                                                                         ),
@@ -845,9 +861,9 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                   children: [
                                                                                     FFButtonWidget(
                                                                                       onPressed: () async {
-                                                                                        context.pop();
+                                                                                        await context.pushNamed(ScanSalesOrderWidget.routeName);
                                                                                       },
-                                                                                      text: 'Cancel',
+                                                                                      text: 'Rescan',
                                                                                       options: FFButtonOptions(
                                                                                         width: MediaQuery.sizeOf(context).width * 0.5,
                                                                                         height: 52.0,
@@ -914,6 +930,23 @@ class _ProcesswScan1WidgetState extends State<ProcesswScan1Widget>
                                                                                               draft.qtyRejected = null;
                                                                                               String startMessage;
                                                                                               try {
+                                                                                                if (draft.salesOrderId == null &&
+                                                                                                    draft.soNumber != null &&
+                                                                                                    draft.customerName != null &&
+                                                                                                    draft.batchQty != null) {
+                                                                                                  final order = await KintaApiService.postJson(
+                                                                                                    'master-data/sales-orders',
+                                                                                                    {
+                                                                                                      'so_number': draft.soNumber,
+                                                                                                      'customer_name': draft.customerName,
+                                                                                                      'batch_qty': draft.batchQty,
+                                                                                                    },
+                                                                                                  );
+                                                                                                  draft.salesOrderId = int.tryParse(order['id']?.toString() ?? '');
+                                                                                                  try {
+                                                                                                    await KintaLocalRepository.removePendingSalesOrder(draft.soNumber!);
+                                                                                                  } catch (_) {}
+                                                                                                }
                                                                                                 final data = await KintaApiService.postJson('processes', {
                                                                                                   'machine_id': draft.machineId,
                                                                                                   'sector_id': draft.sectorId,

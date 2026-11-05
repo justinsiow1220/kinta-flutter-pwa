@@ -38,8 +38,8 @@ class _HomeWidgetState extends State<HomeWidget> {
   bool _machinesLoading = true;
   String? _machineLoadError;
   int _pendingSyncCount = 0;
-  int _needsReviewCount = 0;
-  int _waitingForMasterDataCount = 0;
+  int _pendingSalesOrderCount = 0;
+  int _syncAttentionCount = 0;
   bool _syncing = false;
   Timer? _pendingCountTimer;
 
@@ -79,23 +79,24 @@ class _HomeWidgetState extends State<HomeWidget> {
       final counts = await Future.wait<int>([
         KintaLocalRepository.countPendingLocalProcesses(),
         if (actorUserId != null)
-          KintaLocalRepository.countConflictedLocalProcesses(
-            actorUserId: actorUserId,
-          )
-        else
-          Future<int>.value(0),
-        if (actorUserId != null)
-          KintaLocalRepository.countWaitingForMasterDataLocalProcesses(
+          KintaLocalRepository.countPendingSalesOrders(
             actorUserId: actorUserId,
           )
         else
           Future<int>.value(0),
       ]);
+      final localProcesses = await KintaLocalRepository.readAllLocalProcesses();
+      final processErrorCount = localProcesses
+          .where((process) =>
+              actorUserId != null &&
+              process['actor_user_id']?.toString() == actorUserId &&
+              (process['sync_error']?.toString().trim().isNotEmpty ?? false))
+          .length;
       if (mounted) {
         setState(() {
           _pendingSyncCount = counts[0];
-          _needsReviewCount = counts[1];
-          _waitingForMasterDataCount = counts[2];
+          _pendingSalesOrderCount = counts[1];
+          _syncAttentionCount = counts[1] + processErrorCount;
         });
       }
     } catch (_) {
@@ -112,25 +113,30 @@ class _HomeWidgetState extends State<HomeWidget> {
       );
       await _refreshPendingSyncCount();
       if (!mounted) return;
+      final orderMessage = report.salesOrdersSynced > 0
+          ? '${report.salesOrdersSynced} sales order(s) synced. '
+          : '';
       final message = report.needsReview > 0
-          ? '${report.synced} process(es) synced. '
+          ? '$orderMessage${report.synced} process(es) synced. '
               '${report.needsReview} process(es) need review. '
               'Open Process Records for details.'
           : report.waitingForMasterData > 0
-              ? '${report.synced} process(es) synced. '
+              ? '$orderMessage${report.synced} process(es) synced. '
                   '${report.waitingForMasterData} process(es) are waiting for '
                   'master data reactivation.'
               : report.hasErrors && _pendingSyncCount > 0
-                  ? '${report.synced} process(es) synced. '
+                  ? '$orderMessage${report.synced} process(es) synced. '
                       '$_pendingSyncCount process(es) remain saved on this '
                       'device. KINTA will retry automatically. '
                       'Open Process Records for details.'
                   : report.hasErrors
                       ? 'Sync encountered an error. Check Process Records '
                           'to confirm the saved record status.'
-                      : report.synced == 0
+                      : report.synced == 0 && report.salesOrdersSynced == 0
                           ? 'No pending processes to sync.'
-                          : '${report.synced} process(es) synced successfully.';
+                          : report.synced == 0
+                              ? '${report.salesOrdersSynced} sales order(s) synced successfully.'
+                              : '$orderMessage${report.synced} process(es) synced successfully.';
       if (!silent)
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(message)));
@@ -146,11 +152,138 @@ class _HomeWidgetState extends State<HomeWidget> {
   }
 
   Future<void> _showOfflineRecords() async {
-    await showDialog<void>(
-      context: context,
-      builder: (_) => const ProcessRecordsDialog(),
-    );
+    await ProcessRecordsDialog.showBottomSheet(context);
     await _refreshPendingSyncCount();
+  }
+
+  Future<void> _showSyncAttention() async {
+    final actorUserId = KintaAuthService.currentUser?['id']?.toString();
+    final pendingOrders = await KintaLocalRepository.readPendingSalesOrders(
+      actorUserId: actorUserId,
+    );
+    final localProcesses = await KintaLocalRepository.readAllLocalProcesses();
+    final processesWithErrors = localProcesses
+        .where((process) =>
+            actorUserId != null &&
+            process['actor_user_id']?.toString() == actorUserId &&
+            (process['sync_error']?.toString().trim().isNotEmpty ?? false))
+        .toList();
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(sheetContext).size.height * 0.78,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Pending sync and errors',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ),
+                    IconButton(
+                      tooltip: 'Close',
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close),
+                    ),
+                  ],
+                ),
+                const Divider(height: 1),
+                if (pendingOrders.isEmpty && processesWithErrors.isEmpty)
+                  const Expanded(
+                    child: Center(
+                        child: Text('No pending sales orders or sync errors.')),
+                  )
+                else
+                  Expanded(
+                    child: ListView(
+                      children: [
+                        if (pendingOrders.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.only(top: 16, bottom: 6),
+                            child: Text('Pending sales orders',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          for (final order in pendingOrders)
+                            Card(
+                              child: ListTile(
+                                leading:
+                                    const Icon(Icons.receipt_long_outlined),
+                                title: Text(order['so_number']?.toString() ??
+                                    'Sales order'),
+                                subtitle: Text([
+                                  'Customer: ${order['customer_name'] ?? '-'}',
+                                  'Batch quantity: ${order['batch_qty'] ?? '-'}',
+                                  order['last_sync_error']?.toString() ??
+                                      'Waiting to sync',
+                                ].join('\n')),
+                                isThreeLine: true,
+                              ),
+                            ),
+                        ],
+                        if (processesWithErrors.isNotEmpty) ...[
+                          const Padding(
+                            padding: EdgeInsets.only(top: 16, bottom: 6),
+                            child: Text('Process sync errors',
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                          for (final process in processesWithErrors)
+                            Card(
+                              child: ListTile(
+                                leading: const Icon(Icons.error_outline,
+                                    color: Colors.red),
+                                title: Text(
+                                    'Process ${process['server_process_id'] ?? process['local_id'] ?? ''}'),
+                                subtitle:
+                                    Text(process['sync_error'].toString()),
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _syncing
+                        ? null
+                        : () {
+                            Navigator.pop(sheetContext);
+                            _syncPendingProcesses();
+                          },
+                    icon: const Icon(Icons.sync),
+                    label: const Text('Retry Sync'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _prepareOfflineData() async {
@@ -295,42 +428,27 @@ class _HomeWidgetState extends State<HomeWidget> {
               onPressed: _confirmSignOut,
               icon: const Icon(Icons.logout, color: Colors.white),
             ),
-            Tooltip(
-              message: _pendingSyncCount == 0 &&
-                      (_needsReviewCount > 0 || _waitingForMasterDataCount > 0)
-                  ? 'Open local process records needing attention'
-                  : 'Synchronize pending processes',
-              child: TextButton.icon(
-                onPressed: _syncing
-                    ? null
-                    : _pendingSyncCount == 0 &&
-                            (_needsReviewCount > 0 ||
-                                _waitingForMasterDataCount > 0)
-                        ? _showOfflineRecords
-                        : _syncPendingProcesses,
-                icon: _syncing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(_pendingSyncCount == 0 &&
-                            (_needsReviewCount > 0 ||
-                                _waitingForMasterDataCount > 0)
-                        ? Icons.warning_amber_rounded
-                        : Icons.sync),
-                label: Text(
-                  _pendingSyncCount > 0
-                      ? 'Sync ($_pendingSyncCount)'
-                          '${_waitingForMasterDataCount > 0 ? ' | Waiting ($_waitingForMasterDataCount)' : ''}'
-                          '${_needsReviewCount > 0 ? ' | Review ($_needsReviewCount)' : ''}'
-                      : _waitingForMasterDataCount > 0
-                          ? 'Waiting ($_waitingForMasterDataCount)'
-                          : _needsReviewCount > 0
-                              ? 'Review ($_needsReviewCount)'
-                              : 'Sync',
-                ),
-                style: TextButton.styleFrom(foregroundColor: Colors.white),
+            TextButton.icon(
+              onPressed: _syncing ? null : _syncPendingProcesses,
+              icon: _syncing
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.sync),
+              label:
+                  Text('Sync (${_pendingSyncCount + _pendingSalesOrderCount})'),
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+            ),
+            TextButton.icon(
+              onPressed: _showSyncAttention,
+              icon: const Icon(Icons.warning_amber_rounded),
+              label: Text('(${_syncAttentionCount})'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                minimumSize: const Size(48, 40),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
               ),
             ),
           ],

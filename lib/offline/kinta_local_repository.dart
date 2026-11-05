@@ -7,6 +7,7 @@ class KintaLocalRepository {
   static final StoreRef<String, Map<String, Object?>> _masterDataStore = stringMapStoreFactory.store('master_data_cache');
   static final StoreRef<String, Map<String, Object?>> _processDraftStore = stringMapStoreFactory.store('process_drafts');
   static final StoreRef<String, Map<String, Object?>> _processStore = stringMapStoreFactory.store('local_processes');
+  static final StoreRef<String, Map<String, Object?>> _pendingSalesOrderStore = stringMapStoreFactory.store('pending_sales_orders');
   static final StoreRef<String, Map<String, Object?>> _offlineCredentialStore = stringMapStoreFactory.store('offline_auth_credentials');
   static final StoreRef<String, Map<String, Object?>> _offlineSessionStore = stringMapStoreFactory.store('offline_signed_sessions');
 
@@ -56,6 +57,50 @@ class KintaLocalRepository {
     if (rows is! List) return null;
     return rows.whereType<Map>().map((row) => Map<String, dynamic>.from(row)).toList();
   }
+
+  static String _salesOrderKey(String soNumber) => soNumber.trim().toLowerCase();
+
+  static Future<void> savePendingSalesOrder(
+    Map<String, dynamic> salesOrder,
+  ) async {
+    final soNumber = salesOrder['so_number']?.toString().trim() ?? '';
+    if (soNumber.isEmpty) throw ArgumentError('A sales-order number is required.');
+    final db = await KintaLocalDatabase.open();
+    final key = _salesOrderKey(soNumber);
+    final existing = await _pendingSalesOrderStore.record(key).get(db);
+    if (existing != null &&
+        (existing['customer_name'] != salesOrder['customer_name'] ||
+            existing['batch_qty']?.toString() !=
+                salesOrder['batch_qty']?.toString())) {
+      throw StateError(
+          'A different offline sales order with this number is already queued.');
+    }
+    await _pendingSalesOrderStore.record(key).put(db, {
+      ...Map<String, Object?>.from(salesOrder),
+      'actor_user_id': salesOrder['actor_user_id'],
+      'saved_locally_at': DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> readPendingSalesOrders({
+    String? actorUserId,
+  }) async {
+    final db = await KintaLocalDatabase.open();
+    final rows = await _pendingSalesOrderStore.find(db);
+    return rows
+        .map((row) => Map<String, dynamic>.from(row.value))
+        .where((order) => actorUserId == null ||
+            order['actor_user_id']?.toString() == actorUserId)
+        .toList();
+  }
+
+  static Future<void> removePendingSalesOrder(String soNumber) async {
+    final db = await KintaLocalDatabase.open();
+    await _pendingSalesOrderStore.record(_salesOrderKey(soNumber)).delete(db);
+  }
+
+  static Future<int> countPendingSalesOrders({String? actorUserId}) async =>
+      (await readPendingSalesOrders(actorUserId: actorUserId)).length;
 
   static Future<void> clearCurrentProcessDraft() async {
     final db = await KintaLocalDatabase.open();

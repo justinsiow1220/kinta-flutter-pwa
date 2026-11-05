@@ -405,9 +405,7 @@ class _ProcesswScan5WidgetState extends State<ProcesswScan5Widget>
                                                             physics:
                                                                 const NeverScrollableScrollPhysics(),
                                                             children: [
-                                                              const ProcessRecordsDialog(
-                                                                  embedded:
-                                                                      true),
+                                                              const ProcessRecordsPreviousTab(),
                                                               Padding(
                                                                 padding:
                                                                     const EdgeInsets

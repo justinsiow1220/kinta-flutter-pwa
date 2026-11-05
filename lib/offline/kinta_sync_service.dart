@@ -7,12 +7,14 @@ class KintaSyncReport {
   const KintaSyncReport({
     required this.synced,
     required this.errors,
+    this.salesOrdersSynced = 0,
     this.needsReview = 0,
     this.waitingForMasterData = 0,
   });
 
   final int synced;
   final List<String> errors;
+  final int salesOrdersSynced;
   final int needsReview;
   final int waitingForMasterData;
 
@@ -73,9 +75,8 @@ class KintaSyncService {
       else
         Future.value(<Map<String, dynamic>>[]),
     ]);
-    final activeMachineIds = results[0]
-        .map((machine) => machine['id'].toString())
-        .toSet();
+    final activeMachineIds =
+        results[0].map((machine) => machine['id'].toString()).toSet();
     final activeSectorIds =
         results[1].map((sector) => sector['id'].toString()).toSet();
 
@@ -112,7 +113,8 @@ class KintaSyncService {
     return requeued;
   }
 
-  static Future<KintaSyncReport> syncPendingProcesses({bool forceRetry = false}) {
+  static Future<KintaSyncReport> syncPendingProcesses(
+      {bool forceRetry = false}) {
     if (!KintaAuthService.hasPermission('process.sync')) {
       return Future.value(const KintaSyncReport(
         synced: 0,
@@ -132,12 +134,46 @@ class KintaSyncService {
     return sync;
   }
 
-  static Future<KintaSyncReport> _performSync({required bool forceRetry}) async {
+  static Future<KintaSyncReport> _performSync(
+      {required bool forceRetry}) async {
     var synced = 0;
+    var salesOrdersSynced = 0;
     var needsReview = 0;
     var waitingForMasterData = 0;
     final errors = <String>[];
     try {
+      final actorUserId = KintaAuthService.currentUser?['id']?.toString();
+      if (actorUserId != null) {
+        final pendingOrders = await KintaLocalRepository.readPendingSalesOrders(
+          actorUserId: actorUserId,
+        );
+        for (final order in pendingOrders) {
+          final soNumber = order['so_number']?.toString() ?? '';
+          try {
+            await KintaApiService.postJson('master-data/sales-orders', {
+              'so_number': soNumber,
+              'customer_name': order['customer_name'],
+              'batch_qty': order['batch_qty'],
+            });
+            await KintaLocalRepository.removePendingSalesOrder(soNumber);
+            salesOrdersSynced++;
+          } catch (error) {
+            errors.add('Sales order $soNumber: $error');
+            try {
+              final savedAt = DateTime.now().toUtc();
+              await KintaLocalRepository.savePendingSalesOrder({
+                ...order,
+                'last_sync_error': error.toString(),
+                'last_sync_attempt_at': savedAt.toIso8601String(),
+                'sync_retry_count':
+                    ((_asInt(order['sync_retry_count']) ?? 0) + 1),
+              });
+            } catch (_) {
+              // Keep the queued order even if recording its error fails.
+            }
+          }
+        }
+      }
       final pending = await KintaLocalRepository.readPendingLocalProcesses();
       for (final process in pending) {
         final localId = process['local_id']?.toString();
@@ -149,8 +185,10 @@ class KintaSyncService {
         if (!forceRetry && !_retryIsDue(process)) continue;
 
         final currentUserId = KintaAuthService.currentUser?['id']?.toString();
-        if (currentUserId == null || process['actor_user_id']?.toString() != currentUserId) {
-          const message = 'This queued process is not bound to the currently signed-in account. It was preserved and not uploaded.';
+        if (currentUserId == null ||
+            process['actor_user_id']?.toString() != currentUserId) {
+          const message =
+              'This queued process is not bound to the currently signed-in account. It was preserved and not uploaded.';
           errors.add('Process $localId: $message');
           await KintaLocalRepository.updateLocalProcess(localId, {
             'sync_pending': false,
@@ -197,20 +235,21 @@ class KintaSyncService {
         }
 
         final completed = process['status'] == 'completed';
+        final processPayload = <String, dynamic>{
+          'machine_id': process['machine_id'],
+          'sector_id': process['sector_id'],
+          'activity_id': process['activity_id'],
+          'sales_order_id': process['sales_order_id'],
+          'current_supervisor_id': process['current_supervisor_id'],
+          'operator_ids': process['operator_ids'] ?? <int>[],
+          'description': process['description'],
+          'started_at': process['started_at'],
+        };
         final body = <String, dynamic>{
           'local_process_id': localId,
           'actor_user_id': KintaAuthService.currentUser?['id'],
           'server_process_id': _asInt(process['server_process_id']),
-          'process': {
-            'machine_id': process['machine_id'],
-            'sector_id': process['sector_id'],
-            'activity_id': process['activity_id'],
-            'sales_order_id': process['sales_order_id'],
-            'current_supervisor_id': process['current_supervisor_id'],
-            'operator_ids': process['operator_ids'] ?? <int>[],
-            'description': process['description'],
-            'started_at': process['started_at'],
-          },
+          'process': processPayload,
           'qc_inspections': qcPending,
           'pic_history': picPayload,
           'problems': problemPending,
@@ -226,6 +265,34 @@ class KintaSyncService {
         };
 
         try {
+          if (processPayload['sales_order_id'] == null &&
+              (process['so_number']?.toString().trim().isNotEmpty ?? false) &&
+              (process['customer_name']?.toString().trim().isNotEmpty ??
+                  false) &&
+              _asInt(process['batch_qty']) != null) {
+            final order = await KintaApiService.postJson(
+              'master-data/sales-orders',
+              {
+                'so_number': process['so_number'],
+                'customer_name': process['customer_name'],
+                'batch_qty': _asInt(process['batch_qty']),
+              },
+            );
+            final salesOrderId = _asInt(order['id']);
+            if (salesOrderId == null) {
+              throw const FormatException(
+                  'CI4 did not return the synchronized sales-order ID.');
+            }
+            processPayload['sales_order_id'] = salesOrderId;
+            await KintaLocalRepository.updateLocalProcess(localId, {
+              'sales_order_id': salesOrderId,
+            });
+            try {
+              await KintaLocalRepository.removePendingSalesOrder(
+                process['so_number'].toString(),
+              );
+            } catch (_) {}
+          }
           final result = await KintaApiService.postJson('processes/sync', body);
           final serverId = _asInt(result['process_id']);
           if (serverId == null) {
@@ -270,6 +337,7 @@ class KintaSyncService {
           final draft = KintaProcessDraft.instance;
           if (draft.localProcessId == localId) {
             draft.processId = serverId;
+            draft.salesOrderId = _asInt(processPayload['sales_order_id']);
             draft.persistInBackground();
           }
           synced++;
@@ -285,7 +353,8 @@ class KintaSyncService {
                 'sync_error': error.message,
                 'conflict_code': error.errorCode,
                 'conflict_snapshot': error.data ?? <String, dynamic>{},
-                'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
+                'conflict_detected_at':
+                    DateTime.now().toUtc().toIso8601String(),
                 'sync_retry_count': 0,
                 'next_sync_attempt_at': null,
               });
@@ -297,14 +366,14 @@ class KintaSyncService {
                 'sync_error': error.message,
                 'conflict_code': error.errorCode ?? 'HTTP_${error.statusCode}',
                 'conflict_snapshot': error.data ?? <String, dynamic>{},
-                'conflict_detected_at': DateTime.now().toUtc().toIso8601String(),
+                'conflict_detected_at':
+                    DateTime.now().toUtc().toIso8601String(),
                 'sync_retry_count': 0,
                 'next_sync_attempt_at': null,
               });
               needsReview++;
             } else {
-              final retryCount =
-                  (_asInt(process['sync_retry_count']) ?? 0) + 1;
+              final retryCount = (_asInt(process['sync_retry_count']) ?? 0) + 1;
               final exponent = (retryCount - 1).clamp(0, 5).toInt();
               final delaySeconds =
                   (10 * (1 << exponent)).clamp(10, 300).toInt();
@@ -325,6 +394,7 @@ class KintaSyncService {
       }
       return KintaSyncReport(
         synced: synced,
+        salesOrdersSynced: salesOrdersSynced,
         errors: errors,
         needsReview: needsReview,
         waitingForMasterData: waitingForMasterData,
@@ -361,6 +431,3 @@ class KintaSyncService {
     return nextAttempt == null || !DateTime.now().toUtc().isBefore(nextAttempt);
   }
 }
-
-
-

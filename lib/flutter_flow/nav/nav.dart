@@ -53,7 +53,8 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           return HomeWidget.routePath;
         }
         return null;
-      },      routes: [
+      },
+      routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
@@ -127,11 +128,6 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: ProcesswScan2Widget.routeName,
           path: ProcesswScan2Widget.routePath,
           builder: (context, params) => const ProcesswScan2Widget(),
-        ),
-        FFRoute(
-          name: ProcesswScan3Widget.routeName,
-          path: ProcesswScan3Widget.routePath,
-          builder: (context, params) => const ProcesswScan3Widget(),
         ),
         FFRoute(
           name: ProcesswScan4Widget.routeName,

@@ -6,7 +6,10 @@ import 'dart:convert';
 import '/index.dart';
 import '/kinta_api_service.dart';
 import '/kinta_process_draft.dart';
+import '/auth/kinta_auth_service.dart';
+import '/offline/kinta_local_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -90,23 +93,49 @@ class _ScanSalesOrderWidgetState extends State<ScanSalesOrderWidget> {
             'The QR code must contain a positive batch_qty.');
       }
 
-      final order = await KintaApiService.postJson(
-        'master-data/sales-orders',
-        {
+      Map<String, dynamic>? order;
+      var queuedOffline = false;
+      try {
+        order = await KintaApiService.postJson(
+          'master-data/sales-orders',
+          {
+            'so_number': soNumber,
+            'customer_name': customerName,
+            'batch_qty': batchQty,
+          },
+        );
+      } on http.ClientException {
+        // Keep the scanned order in the process draft. Process sync will
+        // create/reuse the server sales order before uploading the process.
+        queuedOffline = true;
+        await KintaLocalRepository.savePendingSalesOrder({
           'so_number': soNumber,
           'customer_name': customerName,
           'batch_qty': batchQty,
-        },
-      );
+          'actor_user_id': KintaAuthService.currentUser?['id'],
+        });
+      }
+      if (order != null) {
+        try {
+          await KintaLocalRepository.removePendingSalesOrder(soNumber);
+        } catch (_) {}
+      }
 
       KintaProcessDraft.instance.prepareForNewProcess();
       KintaProcessDraft.instance
-        ..salesOrderId = int.tryParse(order['id']?.toString() ?? '')
-        ..soNumber = order['so_number']?.toString()
-        ..customerName = order['customer_name']?.toString()
-        ..batchQty = int.tryParse(order['batch_qty']?.toString() ?? '');
+        ..salesOrderId = int.tryParse(order?['id']?.toString() ?? '')
+        ..soNumber = order?['so_number']?.toString() ?? soNumber
+        ..customerName = order?['customer_name']?.toString() ?? customerName
+        ..batchQty = int.tryParse(order?['batch_qty']?.toString() ?? '') ?? batchQty;
       KintaProcessDraft.instance.persistInBackground();
-      if (mounted) context.pushNamed(ProcesswScan0Widget.routeName);
+      if (mounted) {
+        if (queuedOffline) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Sales order saved on this device. It will sync with the process when online.'),
+          ));
+        }
+        context.pushNamed(ProcesswScan0Widget.routeName);
+      }
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -7,11 +7,38 @@ import '/utils/kinta_time.dart';
 
 /// Displays server-side process history and local work waiting to synchronize.
 class ProcessRecordsDialog extends StatefulWidget {
-  const ProcessRecordsDialog({super.key, this.embedded = false});
+  const ProcessRecordsDialog({
+    super.key,
+    this.embedded = false,
+    this.bottomSheet = false,
+  });
 
   /// When true, renders the same records list inside Process Setup's Previous tab.
   /// The embedded history is read-only and does not include a dialog Close action.
   final bool embedded;
+  final bool bottomSheet;
+
+  static Future<void> showBottomSheet(
+    BuildContext context, {
+    bool readOnly = false,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * .88,
+        child: ProcessRecordsDialog(
+          embedded: readOnly,
+          bottomSheet: true,
+        ),
+      ),
+    );
+  }
 
   @override
   State<ProcessRecordsDialog> createState() => _ProcessRecordsDialogState();
@@ -232,6 +259,16 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
         !widget.embedded && KintaAuthService.hasPermission('process.delete');
     final content = Column(
       children: [
+        if (widget.bottomSheet)
+          Container(
+            width: 40,
+            height: 4,
+            margin: const EdgeInsets.only(top: 10),
+            decoration: BoxDecoration(
+              color: Colors.black26,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
         ListTile(
           title: const Text(
             'Process Records',
@@ -240,10 +277,21 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
           subtitle: const Text(
             'Server records visible to this account and local copies',
           ),
-          trailing: IconButton(
-            onPressed: _loading ? null : _loadRecords,
-            tooltip: 'Refresh records',
-            icon: const Icon(Icons.refresh),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: _loading ? null : _loadRecords,
+                tooltip: 'Refresh records',
+                icon: const Icon(Icons.refresh),
+              ),
+              if (widget.bottomSheet)
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  tooltip: 'Close process records',
+                  icon: const Icon(Icons.close),
+                ),
+            ],
           ),
         ),
         if (_loading) const LinearProgressIndicator(),
@@ -279,7 +327,7 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
                   ],
                 ),
         ),
-        if (!widget.embedded)
+        if (!widget.embedded && !widget.bottomSheet)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
@@ -290,7 +338,7 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
       ],
     );
 
-    if (widget.embedded) return content;
+    if (widget.embedded || widget.bottomSheet) return content;
     final width = MediaQuery.sizeOf(context).width;
     return Dialog(
       child: SizedBox(
@@ -448,6 +496,47 @@ class _ProcessRecordsDialogState extends State<ProcessRecordsDialog> {
       ),
     );
   }
+}
+
+/// Entry point shown in the Previous tab; opens the full records list in a
+/// larger mobile-friendly bottom sheet.
+class ProcessRecordsPreviousTab extends StatelessWidget {
+  const ProcessRecordsPreviousTab({super.key});
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.history, size: 48),
+              const SizedBox(height: 12),
+              Text(
+                'Previous process records',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Open the process history in a larger view.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () => ProcessRecordsDialog.showBottomSheet(
+                  context,
+                  readOnly: true,
+                ),
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('View process records'),
+              ),
+            ],
+          ),
+        ),
+      );
 }
 
 class _SectionHeader extends StatelessWidget {
